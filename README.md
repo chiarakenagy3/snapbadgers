@@ -1,2 +1,2 @@
-# snapbadgers
-This is the team project for Qualcomm team on CS 620.
+# Snapbadgers
+This is the team project for Team Qualcomm in CS 620.
