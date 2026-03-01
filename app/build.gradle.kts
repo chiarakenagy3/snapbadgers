@@ -37,6 +37,9 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -56,4 +59,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    
+    // TFLite generic dependencies for Qualcomm AI Hub models
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 }
