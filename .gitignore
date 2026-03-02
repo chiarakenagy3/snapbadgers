@@ -14,9 +14,10 @@
 .cxx
 local.properties
 
-# Agent Context
-agent_context/
 # Local build and environment
 venv/
 export_assets/
 *.tflite
+
+# Agent Context
+agent_context/

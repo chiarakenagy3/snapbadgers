@@ -18,11 +18,13 @@ class QualcommTextEncoder(
 
     private var interpreter: Interpreter? = null
     private var nnApiDelegate: NnApiDelegate? = null
-    
+
     private val inputMaxLen = 128
     private val outputDim = 128
 
-    init {
+    private fun initializeInterpreter() {
+        if (interpreter != null) return
+        
         val options = Interpreter.Options()
         // For Galaxy S25 / Android, NNAPI is the standard way to leverage the NPU via delegates
         nnApiDelegate = NnApiDelegate()
@@ -32,12 +34,13 @@ class QualcommTextEncoder(
         interpreter = Interpreter(modelBuffer, options)
     }
 
-    override suspend fun encode(query: String): FloatArray = withContext(Dispatchers.`default`) {
+    override suspend fun encode(query: String): FloatArray = withContext(Dispatchers.Default) {
         if (query.isBlank()) {
             return@withContext FloatArray(outputDim) { 0f }
         }
 
         try {
+            initializeInterpreter()
             val tokens = tokenizer.tokenize(query)
             
             // Prepare input buffer (padded to inputMaxLen)
