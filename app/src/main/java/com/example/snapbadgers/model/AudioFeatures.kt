@@ -1,7 +1,9 @@
 package com.example.snapbadgers.model
 
-// Data class for Spotify audio features
+import com.google.gson.annotations.SerializedName
+
 data class AudioFeatures(
+    val id: String,
     val danceability: Float,
     val energy: Float,
     val speechiness: Float,
@@ -11,5 +13,7 @@ data class AudioFeatures(
     val valence: Float,
     val tempo: Float,
     val loudness: Float,
-    val duration_ms: Float
+    val key: Int,
+    val mode: Int,
+    @SerializedName("duration_ms") val duration_ms: Float = 240000f
 )

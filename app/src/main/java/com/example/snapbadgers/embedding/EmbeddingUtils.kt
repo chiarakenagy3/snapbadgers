@@ -4,7 +4,7 @@ import com.example.snapbadgers.model.AudioFeatures
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Build base feature vector
+// 构建基础向量
 fun buildBaseVector(f: AudioFeatures): FloatArray {
     return floatArrayOf(
         f.danceability,
@@ -15,9 +15,24 @@ fun buildBaseVector(f: AudioFeatures): FloatArray {
         f.liveness,
         f.valence,
         f.tempo / 200f,
-        (f.loudness + 60f) / 60f,
+        // 归一化 Loudness: 通常范围在 -60 到 0 之间
+        (f.loudness + 60f).coerceIn(0f, 60f) / 60f,
+        // 如果 API 确实没给时长，这个值将使用模型里的默认值
         f.duration_ms / 300000f
     )
+}
+
+fun getEmbedding(features: AudioFeatures?): FloatArray {
+    if (features == null) return FloatArray(128) { 0f }
+
+    val base = buildBaseVector(features)
+    val derived = addDerivedFeatures(base)
+    val combined = base + derived
+
+    var embedding = projectTo128(combined)
+    embedding = normalize(embedding)
+
+    return embedding
 }
 
 // Add derived features
@@ -63,17 +78,4 @@ fun normalize(vec: FloatArray): FloatArray {
     if (norm == 0f) return vec
 
     return FloatArray(vec.size) { i -> vec[i] / norm }
-}
-
-// Full embedding pipeline
-fun getEmbedding(features: AudioFeatures): FloatArray {
-    val base = buildBaseVector(features)
-    val derived = addDerivedFeatures(base)
-
-    val combined = base + derived
-
-    var embedding = projectTo128(combined)
-    embedding = normalize(embedding)
-
-    return embedding
 }
