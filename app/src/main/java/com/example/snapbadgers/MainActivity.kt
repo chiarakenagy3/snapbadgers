@@ -34,13 +34,19 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun RecommendationDemoScreen(modifier: Modifier = Modifier) {
-    val inputText = "I want something energetic and happy!"
-    val recommendations = remember { SongRecommenderDemo.getRecommendationsForText(inputText) }
+    val contextInput = "I'm feeling happy and energetic!"
+    // Use the updated recommendation method
+    val recommendations = remember { SongRecommenderDemo.getCombinedRecommendations(contextInput) }
 
     Column(modifier = modifier.padding(16.dp)) {
         Text(
-            text = "Input: \"$inputText\"",
+            text = "Context: \"$contextInput\"",
             style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Text(
+            text = "Combined with User Preference (High Energy)",
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
         Text(
