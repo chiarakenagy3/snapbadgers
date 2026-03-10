@@ -5,166 +5,188 @@ import android.util.Base64
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import com.example.snapbadgers.embedding.YamnetFeatureExtractor
-import com.example.snapbadgers.repository.SpotifyRepository
-import com.example.snapbadgers.network.SpotifyApi
-import com.example.snapbadgers.network.AuthApi
-import com.example.snapbadgers.network.Track
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import retrofit2.HttpException
+import com.example.snapbadgers.embedding.getEmbedding
+import com.example.snapbadgers.network.*
+import com.google.gson.Gson
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+data class ProcessedTrack(
+    val trackId: String,
+    val name: String,
+    val artists: String,
+    val source: String,
+    val embedding: List<Float>
+)
 class MainActivity : ComponentActivity() {
 
-    private val tag = "SnapBadger"
+    private val TAG = "SnapBadger"
+    private val RECCOBEATS_BASE_URL = "https://api.reccobeats.com/"
+
+    // UI State
+    private var statusText by mutableStateOf("Ready")
+    private var logText by mutableStateOf("")
+    private val logBuilder = StringBuilder()
+
+    // Caches
+    private val artistAlbumCache = ConcurrentHashMap<String, List<ReccoAlbum>>()
+    private val albumTrackCache = ConcurrentHashMap<String, List<ReccoTrack>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        var statusText by mutableStateOf("Initializing...")
-        var topTracksList by mutableStateOf("")
-        var embeddingResult by mutableStateOf("")
-
         setContent {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Status: $statusText")
-                Spacer(modifier = Modifier.height(16.dp))
-                if (topTracksList.isNotEmpty()) {
-                    Text(text = "Tracks for Analysis:")
-                    Text(text = topTracksList)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                if (embeddingResult.isNotEmpty()) {
-                    Text(text = "128-d Song Embedding:")
-                    Text(text = embeddingResult)
+            Surface(modifier = Modifier.fillMaxSize(), color = androidx.compose.ui.graphics.Color.White) {
+                Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+                    Text("System Status:", style = MaterialTheme.typography.labelLarge)
+                    Text(statusText, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Process Log:", style = MaterialTheme.typography.titleMedium)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(logText, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
 
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://api.spotify.com/")
-            .addConverterFactory(GsonConverterFactory.create())
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
             .build()
 
-        val authRetrofit = Retrofit.Builder()
-            .baseUrl("https://accounts.spotify.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        val api = retrofit.create(SpotifyApi::class.java)
-        val authApi = authRetrofit.create(AuthApi::class.java)
-        val repo = SpotifyRepository(api)
-        val yamnetExtractor = YamnetFeatureExtractor(this)
+        val spotifyApi = Retrofit.Builder().baseUrl("https://api.spotify.com/").client(okHttpClient).addConverterFactory(GsonConverterFactory.create()).build().create(SpotifyApi::class.java)
+        val authApi = Retrofit.Builder().baseUrl("https://accounts.spotify.com/").client(okHttpClient).addConverterFactory(GsonConverterFactory.create()).build().create(AuthApi::class.java)
+        val reccoApi = Retrofit.Builder().baseUrl(RECCOBEATS_BASE_URL).client(okHttpClient).addConverterFactory(GsonConverterFactory.create()).build().create(ReccoBeatsApi::class.java)
 
         lifecycleScope.launch {
             try {
-                // 1. Refresh Token
-                statusText = "Refreshing token..."
-                val clientId = BuildConfig.SPOTIFY_CLIENT_ID.trim()
-                val clientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET.trim()
-                val refreshToken = BuildConfig.SPOTIFY_REFRESH_TOKEN.trim()
+                statusText = "Authenticating..."
+                val authHeader = "Basic " + Base64.encodeToString("${BuildConfig.SPOTIFY_CLIENT_ID}:${BuildConfig.SPOTIFY_CLIENT_SECRET}".toByteArray(), Base64.NO_WRAP)
+                val tokenResponse = authApi.refreshToken(authHeader, "refresh_token", BuildConfig.SPOTIFY_REFRESH_TOKEN.trim())
+                val spotifyToken = "Bearer ${tokenResponse.access_token}"
 
-                if (clientId.isEmpty() || clientSecret.isEmpty() || refreshToken.isEmpty()) {
-                    statusText = "Error: Missing ID/Secret/Refresh Token in local.properties"
-                    return@launch
-                }
+                statusText = "Fetching Top Tracks..."
+                val topTracks = spotifyApi.getTopTracks(spotifyToken, "medium_term", 10).items
+                updateLog("✓ Found ${topTracks.size} tracks on Spotify")
 
-                val authHeader = "Basic " + Base64.encodeToString(
-                    "$clientId:$clientSecret".toByteArray(),
-                    Base64.NO_WRAP
-                )
+                val semaphore = Semaphore(2)
+                val results = topTracks.map { spotifyTrack ->
+                    async(Dispatchers.IO) {
+                        semaphore.withPermit {
+                            // 1. Primary Search
+                            var foundTrack = withTimeoutOrNull(20000) {
+                                searchWithStrategy(reccoApi, spotifyTrack.name, spotifyTrack.artists.firstOrNull()?.name)
+                            }
 
-                val tokenResponse = authApi.refreshToken(
-                    authHeader = authHeader,
-                    grantType = "refresh_token",
-                    refreshToken = refreshToken
-                )
-                val accessToken = tokenResponse.access_token
+                            var label = "Matched"
 
-                // 2. Fetch Top Tracks - Using a conservative limit of 10
-                statusText = "Searching for tracks with audio previews..."
+                            // 2. Fallback to Blank Space if null
+                            if (foundTrack == null) {
+                                withContext(Dispatchers.Main) { updateLog("⚠ Falling back for: ${spotifyTrack.name}") }
+                                foundTrack = withTimeoutOrNull(10000) {
+                                    searchWithStrategy(reccoApi, "Blank Space", "Taylor Swift")
+                                }
+                                label = "Fallback"
+                            }
 
-                val topTracksResponse = try {
-                    api.getTopTracks(
-                        token = "Bearer $accessToken",
-                        timeRange = "long_term",
-                        limit = 10
-                    )
-                } catch (e: Exception) {
-                    null
-                }
-                
-                var tracksWithAudio = topTracksResponse?.items?.filter { it.preview_url != null } ?: emptyList()
+                            if (foundTrack != null) {
+                                try {
+                                    val features = reccoApi.getTrackFeatures(foundTrack.id)
+                                    val embedding = getEmbedding(features).toList()
+                                    withContext(Dispatchers.Main) { updateLog("✓ [$label] ${foundTrack!!.trackTitle}") }
+                                    if (label == "Matched") {
+                                        val prettyFeatures = Gson().newBuilder()
+                                            .setPrettyPrinting() // 格式化输出，让它带缩进
+                                            .create()
+                                            .toJson(features)
 
-                // 3. Fallback: Search with conservative limit of 10
-                if (tracksWithAudio.isEmpty()) {
-                    statusText = "No top track previews found. Searching global hits..."
-                    val searchResponse = api.searchTracks(
-                        token = "Bearer $accessToken",
-                        query = "genre:pop",
-                        type = "track",
-                        limit = 10
-                    )
-                    tracksWithAudio = searchResponse.tracks.items.filter { it.preview_url != null }
-                }
+                                        updateLog("--- Audio Features ---")
+                                        updateLog(prettyFeatures)
+                                        updateLog("----------------------")
+                                    }
+                                    val artistName = foundTrack.artists?.firstOrNull()?.name ?: "Unknown"
 
-                // 4. Final Fallback Strategy
-                val finalAudioUrl: String?
-                val targetTrackName: String
-                
-                if (tracksWithAudio.isNotEmpty()) {
-                    val targetTrack = tracksWithAudio.first()
-                    finalAudioUrl = targetTrack.preview_url
-                    targetTrackName = targetTrack.name
-                    topTracksList = tracksWithAudio.take(5).joinToString("\n") { "${it.name} [✓ Audio]" }
-                } else {
-                    // Ultimate fallback to ensure the demo always works
-                    statusText = "Spotify provided no previews. Using Demo Audio for YAMNet..."
-                    finalAudioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                    targetTrackName = "Demo Track (Fallback)"
-                    topTracksList = "No Spotify previews found.\nRunning YAMNet on Sample MP3..."
-                }
-
-                if (finalAudioUrl != null) {
-                    statusText = "Downloading audio for $targetTrackName..."
-
-                    val audioData = withContext(Dispatchers.IO) {
-                        yamnetExtractor.downloadAudio(finalAudioUrl)
-                    }
-
-                    if (audioData != null) {
-                        statusText = "Extracting features using YAMNet..."
-                        val vector = withContext(Dispatchers.Default) {
-                            yamnetExtractor.extractFeatures(audioData)
+                                    ProcessedTrack(
+                                        foundTrack.id,
+                                        foundTrack.trackTitle,
+                                        artistName,
+                                        label,
+                                        embedding
+                                    )
+                                } catch (e: Exception) { null }
+                            } else null
                         }
-                        embeddingResult = "Vector: " + vector.take(8).joinToString(", ") { "%.4f".format(it) }
-                        statusText = "128-d Embedding generated for $targetTrackName"
-                    } else {
-                        statusText = "Failed to download audio data."
                     }
+                }.awaitAll().filterNotNull()
+
+                if (results.isNotEmpty()) {
+                    val gson = Gson().newBuilder()
+                        .setPrettyPrinting()
+                        .create()
+
+                    var json = gson.toJson(results)
+
+                    json = json.replace(Regex("\"embedding\": \\[([^\\]]+)]")) { match ->
+                        val content = match.groupValues[1]
+                            .replace("\n", "")
+                            .replace(" ", "")
+                        "\"embedding\": [$content]"
+                    }
+
+                    withContext(Dispatchers.IO) { File(filesDir, "tracks_features.json").writeText(json) }
+                    statusText = "Done! Saved ${results.size}"
                 }
 
             } catch (e: Exception) {
-                val errorMsg = if (e is HttpException) {
-                    val errorBody = e.response()?.errorBody()?.string()
-                    "HTTP ${e.code()}: $errorBody"
-                } else {
-                    e.message ?: "Unknown error"
-                }
-                statusText = "Error: $errorMsg"
+                statusText = "Error"
+                updateLog("Fatal Error: ${e.localizedMessage}")
             }
+        }
+    }
+
+    // --- Helper Functions ---
+
+    private fun updateLog(msg: String) {
+        logBuilder.append(msg).append("\n")
+        logText = logBuilder.toString().takeLast(3000)
+    }
+
+    private suspend fun searchWithStrategy(reccoApi: ReccoBeatsApi, trackName: String, artistName: String?): ReccoTrack? {
+        val simple = try {
+            reccoApi.searchTracks(trackName).content.find { it.trackTitle.contains(trackName, true) }
+        } catch (e: Exception) { null }
+
+        if (simple != null) return simple
+
+        return if (artistName != null) findTrackDeeply(reccoApi, trackName, artistName) else null
+    }
+
+    private suspend fun findTrackDeeply(reccoApi: ReccoBeatsApi, trackName: String, artistName: String): ReccoTrack? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val artist = reccoApi.searchArtist(artistName.split(",")[0]).content.firstOrNull() ?: return@withContext null
+                val albums = artistAlbumCache.getOrPut(artist.id) { reccoApi.getArtistAlbums(artist.id).content }
+
+                for (album in albums.take(15)) { // Limit to 5 albums for speed
+                    val tracks = albumTrackCache.getOrPut(album.id) { reccoApi.getAlbumTracks(album.id).content }
+                    val match = tracks.find { it.trackTitle.contains(trackName, true) }
+                    if (match != null) return@withContext match
+                }
+            } catch (e: Exception) { }
+            null
         }
     }
 }
