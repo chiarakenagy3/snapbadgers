@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.example.snapbadgers.embedding.MLPProjector
 import com.example.snapbadgers.embedding.getEmbedding
 import com.example.snapbadgers.network.*
 import com.google.gson.Gson
@@ -25,6 +26,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+
 data class ProcessedTrack(
     val trackId: String,
     val name: String,
@@ -32,6 +34,7 @@ data class ProcessedTrack(
     val source: String,
     val embedding: List<Float>
 )
+
 class MainActivity : ComponentActivity() {
 
     private val TAG = "SnapBadger"
@@ -48,6 +51,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Essential: Initialize the MLP Projector
+        MLPProjector.init(this)
 
         setContent {
             Surface(modifier = Modifier.fillMaxSize(), color = androidx.compose.ui.graphics.Color.White) {
@@ -73,119 +79,144 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             try {
+                // 1. Authentication
                 statusText = "Authenticating..."
                 val authHeader = "Basic " + Base64.encodeToString("${BuildConfig.SPOTIFY_CLIENT_ID}:${BuildConfig.SPOTIFY_CLIENT_SECRET}".toByteArray(), Base64.NO_WRAP)
-                val tokenResponse = authApi.refreshToken(authHeader, "refresh_token", BuildConfig.SPOTIFY_REFRESH_TOKEN.trim())
+                val tokenResponse = try {
+                    authApi.refreshToken(authHeader, "refresh_token", BuildConfig.SPOTIFY_REFRESH_TOKEN.trim())
+                } catch (e: Exception) {
+                    updateLogMain("Auth Error: ${e.message}")
+                    throw e
+                }
                 val spotifyToken = "Bearer ${tokenResponse.access_token}"
 
+                // 2. Fetch Top Tracks
                 statusText = "Fetching Top Tracks..."
-                val topTracks = spotifyApi.getTopTracks(spotifyToken, "medium_term", 10).items
-                updateLog("✓ Found ${topTracks.size} tracks on Spotify")
+                val topTracks = try {
+                    spotifyApi.getTopTracks(spotifyToken, "medium_term", 10).items
+                } catch (e: Exception) {
+                    updateLogMain("Spotify API Error: ${e.message}")
+                    throw e
+                }
+                updateLogMain("✓ Found ${topTracks.size} tracks on Spotify")
 
+                // 3. Process Tracks using supervisorScope to prevent one failure from cancelling others
                 val semaphore = Semaphore(2)
-                val results = topTracks.map { spotifyTrack ->
-                    async(Dispatchers.IO) {
-                        semaphore.withPermit {
-                            // 1. Primary Search
-                            var foundTrack = withTimeoutOrNull(20000) {
-                                searchWithStrategy(reccoApi, spotifyTrack.name, spotifyTrack.artists.firstOrNull()?.name)
-                            }
-
-                            var label = "Matched"
-
-                            // 2. Fallback to Blank Space if null
-                            if (foundTrack == null) {
-                                withContext(Dispatchers.Main) { updateLog("⚠ Falling back for: ${spotifyTrack.name}") }
-                                foundTrack = withTimeoutOrNull(10000) {
-                                    searchWithStrategy(reccoApi, "Blank Space", "Taylor Swift")
-                                }
-                                label = "Fallback"
-                            }
-
-                            if (foundTrack != null) {
-                                try {
-                                    val features = reccoApi.getTrackFeatures(foundTrack.id)
-                                    val embedding = getEmbedding(features).toList()
-                                    withContext(Dispatchers.Main) { updateLog("✓ [$label] ${foundTrack!!.trackTitle}") }
-                                    if (label == "Matched") {
-                                        val prettyFeatures = Gson().newBuilder()
-                                            .setPrettyPrinting() // 格式化输出，让它带缩进
-                                            .create()
-                                            .toJson(features)
-
-                                        updateLog("--- Audio Features ---")
-                                        updateLog(prettyFeatures)
-                                        updateLog("----------------------")
+                val results = supervisorScope {
+                    topTracks.map { spotifyTrack ->
+                        async(Dispatchers.IO) {
+                            withContext(Dispatchers.Main) { statusText = "Processing: ${spotifyTrack.name}" }
+                            
+                            semaphore.withPermit {
+                                // Search with robust error handling
+                                var foundTrack: ReccoTrack? = try {
+                                    withTimeoutOrNull(25000) {
+                                        searchWithStrategy(reccoApi, spotifyTrack.name, spotifyTrack.artists.firstOrNull()?.name)
                                     }
-                                    val artistName = foundTrack.artists?.firstOrNull()?.name ?: "Unknown"
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Search error for ${spotifyTrack.name}: ${e.message}")
+                                    null
+                                }
 
-                                    ProcessedTrack(
-                                        foundTrack.id,
-                                        foundTrack.trackTitle,
-                                        artistName,
-                                        label,
-                                        embedding
-                                    )
-                                } catch (e: Exception) { null }
-                            } else null
+                                var label = "Matched"
+
+                                // Fallback if not found
+                                if (foundTrack == null) {
+                                    updateLogMain("⚠ Not found: ${spotifyTrack.name}. Trying fallback.")
+                                    foundTrack = try {
+                                        searchWithStrategy(reccoApi, "Blank Space", "Taylor Swift")
+                                    } catch (e: Exception) { null }
+                                    label = "Fallback"
+                                }
+
+                                if (foundTrack != null) {
+                                    try {
+                                        val features = reccoApi.getTrackFeatures(foundTrack.id)
+                                        val embedding = getEmbedding(features).toList()
+                                        updateLogMain("✓ [$label] ${foundTrack.trackTitle}")
+                                        
+                                        val artistName = foundTrack.artists?.firstOrNull()?.name ?: "Unknown"
+                                        ProcessedTrack(foundTrack.id, foundTrack.trackTitle, artistName, label, embedding)
+                                    } catch (e: Exception) { 
+                                        Log.e(TAG, "Feature extraction error for ${foundTrack.trackTitle}: ${e.message}")
+                                        null 
+                                    }
+                                } else null
+                            }
                         }
-                    }
-                }.awaitAll().filterNotNull()
+                    }.awaitAll().filterNotNull()
+                }
 
+                // 4. Save Results
                 if (results.isNotEmpty()) {
-                    val gson = Gson().newBuilder()
-                        .setPrettyPrinting()
-                        .create()
-
+                    statusText = "Saving Results..."
+                    val gson = Gson().newBuilder().setPrettyPrinting().create()
                     var json = gson.toJson(results)
 
-                    json = json.replace(Regex("\"embedding\": \\[([^\\]]+)]")) { match ->
-                        val content = match.groupValues[1]
-                            .replace("\n", "")
-                            .replace(" ", "")
+                    // Compact embedding arrays
+                    json = json.replace(Regex("\"embedding\":\\s*\\[([^\\]]+)\\]")) { match ->
+                        val content = match.groupValues[1].replace("\n", "").replace(" ", "")
                         "\"embedding\": [$content]"
                     }
 
                     withContext(Dispatchers.IO) { File(filesDir, "tracks_features.json").writeText(json) }
-                    statusText = "Done! Saved ${results.size}"
+                    statusText = "Success! Saved ${results.size} tracks"
+                    updateLogMain("✓ Data saved to internal files dir.")
+                } else {
+                    statusText = "Finished with no matches."
                 }
 
+            } catch (e: CancellationException) {
+                // Ignore normal cancellation
+                throw e
             } catch (e: Exception) {
-                statusText = "Error"
-                updateLog("Fatal Error: ${e.localizedMessage}")
+                statusText = "Pipeline Failed"
+                updateLogMain("Fatal Error: ${e.localizedMessage}")
+                Log.e(TAG, "Fatal Exception in Main Pipeline", e)
             }
         }
     }
 
-    // --- Helper Functions ---
-
-    private fun updateLog(msg: String) {
-        logBuilder.append(msg).append("\n")
-        logText = logBuilder.toString().takeLast(3000)
+    private fun updateLogMain(msg: String) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            logBuilder.append(msg).append("\n")
+            logText = logBuilder.toString().takeLast(4000)
+        }
     }
 
     private suspend fun searchWithStrategy(reccoApi: ReccoBeatsApi, trackName: String, artistName: String?): ReccoTrack? {
         val simple = try {
             reccoApi.searchTracks(trackName).content.find { it.trackTitle.contains(trackName, true) }
-        } catch (e: Exception) { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "Simple search failed for $trackName: ${e.message}")
+            null
+        }
 
         if (simple != null) return simple
-
         return if (artistName != null) findTrackDeeply(reccoApi, trackName, artistName) else null
     }
 
     private suspend fun findTrackDeeply(reccoApi: ReccoBeatsApi, trackName: String, artistName: String): ReccoTrack? {
         return withContext(Dispatchers.IO) {
             try {
-                val artist = reccoApi.searchArtist(artistName.split(",")[0]).content.firstOrNull() ?: return@withContext null
-                val albums = artistAlbumCache.getOrPut(artist.id) { reccoApi.getArtistAlbums(artist.id).content }
+                val artistSearch = reccoApi.searchArtist(artistName.split(",")[0])
+                val artist = artistSearch.content.firstOrNull() ?: return@withContext null
+                
+                val albums = artistAlbumCache.getOrPut(artist.id) { 
+                    try { reccoApi.getArtistAlbums(artist.id).content } catch (e: Exception) { emptyList() }
+                }
 
-                for (album in albums.take(15)) { // Limit to 5 albums for speed
-                    val tracks = albumTrackCache.getOrPut(album.id) { reccoApi.getAlbumTracks(album.id).content }
+                for (album in albums.take(5)) {
+                    val tracks = try {
+                        albumTrackCache.getOrPut(album.id) { reccoApi.getAlbumTracks(album.id).content }
+                    } catch (e: Exception) { emptyList() }
+                    
                     val match = tracks.find { it.trackTitle.contains(trackName, true) }
                     if (match != null) return@withContext match
                 }
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                Log.w(TAG, "Deep search failed for $trackName: ${e.message}")
+            }
             null
         }
     }
