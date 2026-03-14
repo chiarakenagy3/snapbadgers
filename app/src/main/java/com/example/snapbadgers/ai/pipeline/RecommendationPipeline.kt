@@ -5,18 +5,21 @@ import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
 import com.example.snapbadgers.ai.text.TextEncoder
+import com.example.snapbadgers.ai.text.TextEncoderFactory
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.Song
 import kotlinx.coroutines.delay
 
-class RecommendationPipeline(context: Context) {
+class RecommendationPipeline(
+    context: Context,
+    private val textEncoder: TextEncoder = TextEncoderFactory.create(context),
+    private val songRepository: SongRepository = SongRepository(context)
+) {
 
-    private val textEncoder = TextEncoder(context)
     private val sensorCollector = SensorCollector(context)
     private val sensorEncoder = SensorEncoder()
     private val fusionEngine = FusionEngine()
-    private val songRepository = SongRepository()
 
     suspend fun runPipeline(
         input: String,
@@ -45,20 +48,19 @@ class RecommendationPipeline(context: Context) {
             steps = steps.copy(fused = true)
             onStepUpdate(steps)
 
-            // 현재는 실제 projection layer가 없으므로
-            // demo step 용도로만 유지
+            val projectedEmbedding = fusedEmbedding
+
             delay(120)
             steps = steps.copy(projected = true)
             onStepUpdate(steps)
 
             delay(160)
-            val song = songRepository.findTopSong(fusedEmbedding)
+            val song = songRepository.findTopSong(projectedEmbedding)
             steps = steps.copy(ranked = true)
             onStepUpdate(steps)
 
             val inferenceMs = System.currentTimeMillis() - startMs
             return song.copy(inferenceTimeMs = inferenceMs)
-
         } finally {
             sensorCollector.stop()
         }
