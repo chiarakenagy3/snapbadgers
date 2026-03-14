@@ -12,6 +12,7 @@ class EmbeddingTest {
     fun testGetEmbedding() {
         // 1. Create mock audio features
         val features = AudioFeatures(
+            id = "test_id",
             danceability = 0.5f,
             energy = 0.8f,
             speechiness = 0.05f,
@@ -21,6 +22,8 @@ class EmbeddingTest {
             valence = 0.6f,
             tempo = 120f,
             loudness = -5f,
+            key = 1,
+            mode = 1,
             duration_ms = 210000f
         )
 

@@ -3,6 +3,8 @@ package com.example.snapbadgers.ml
 import android.content.Context
 import android.graphics.Bitmap
 import com.example.snapbadgers.ai.vision.domain.VisionEncoder
+import com.example.snapbadgers.ai.vision.ml.ImageProcessor
+import com.example.snapbadgers.ai.vision.ml.QualcommVisionEncoder
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
