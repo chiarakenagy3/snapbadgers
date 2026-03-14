@@ -1,3 +1,4 @@
+# Android Studio / IntelliJ
 *.iml
 .gradle
 /local.properties
@@ -14,10 +15,22 @@
 .cxx
 local.properties
 
-# Local build and environment
+# Python
 venv/
-export_assets/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ML Assets & AI Hub
+*.onnx
 *.tflite
+*.pb
+/export_assets/
+/vision_export_assets/
+.qai_hub/
 
 # Agent Context
 agent_context/
+
+# Logs
+*.log

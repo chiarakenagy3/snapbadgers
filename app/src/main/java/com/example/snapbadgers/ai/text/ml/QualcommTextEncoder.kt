@@ -1,6 +1,7 @@
 package com.example.snapbadgers.ai.text.ml
 
 import android.content.Context
+import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.ai.text.domain.TextEncoder
 import com.example.snapbadgers.ai.text.domain.Tokenizer
 import kotlinx.coroutines.Dispatchers
@@ -63,8 +64,9 @@ class QualcommTextEncoder(
             // Run inference
             interpreter?.run(inputBuffer, outputBuffer)
             
-            return@withContext outputBuffer[0]
-            
+            // Align to the same unit hypersphere as Vision and Song embeddings
+            return@withContext VectorUtils.normalize(outputBuffer[0])
+
         } catch (e: Exception) {
             e.printStackTrace()
             FloatArray(outputDim) { 0f }
