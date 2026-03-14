@@ -4,7 +4,6 @@ import android.content.Context
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
-import com.example.snapbadgers.ai.text.TextEncoder
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.Song

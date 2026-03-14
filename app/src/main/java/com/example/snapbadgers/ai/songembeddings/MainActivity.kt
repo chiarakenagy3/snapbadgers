@@ -1,4 +1,4 @@
-package com.example.snapbadgers.songembeddings
+package com.example.snapbadgers.ai.songembeddings
 
 import android.os.Bundle
 import android.util.Base64
@@ -15,13 +15,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.snapbadgers.BuildConfig
-import com.example.snapbadgers.songembeddings.embedding.MLPProjector
-import com.example.snapbadgers.songembeddings.embedding.getEmbedding
-import com.example.snapbadgers.songembeddings.network.AuthApi
-import com.example.snapbadgers.songembeddings.network.ReccoAlbum
-import com.example.snapbadgers.songembeddings.network.ReccoBeatsApi
-import com.example.snapbadgers.songembeddings.network.ReccoTrack
-import com.example.snapbadgers.songembeddings.network.SpotifyApi
+import com.example.snapbadgers.ai.songembeddings.embedding.MLPProjector
+import com.example.snapbadgers.ai.songembeddings.embedding.getEmbedding
+import com.example.snapbadgers.ai.songembeddings.network.AuthApi
+import com.example.snapbadgers.ai.songembeddings.network.ReccoAlbum
+import com.example.snapbadgers.ai.songembeddings.network.ReccoBeatsApi
+import com.example.snapbadgers.ai.songembeddings.network.ReccoTrack
+import com.example.snapbadgers.ai.songembeddings.network.SpotifyApi
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore

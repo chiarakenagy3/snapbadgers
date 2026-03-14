@@ -1,7 +1,7 @@
 package com.example.snapbadgers
 
-import com.example.snapbadgers.songembeddings.embedding.getEmbedding
-import com.example.snapbadgers.songembeddings.model.AudioFeatures
+import com.example.snapbadgers.ai.songembeddings.embedding.getEmbedding
+import com.example.snapbadgers.ai.songembeddings.model.AudioFeatures
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
