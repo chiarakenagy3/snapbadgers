@@ -1,12 +1,14 @@
 package com.example.snapbadgers.ai.pipeline
 
 import android.content.Context
+import android.graphics.Bitmap
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
 import com.example.snapbadgers.ai.text.TextEncoder
 import com.example.snapbadgers.ai.text.TextEncoderFactory
 import com.example.snapbadgers.ai.text.TextEncoderMode
+import com.example.snapbadgers.ai.vision.VisionEncoder
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.RecommendationResult
@@ -20,6 +22,7 @@ class RecommendationPipeline(
 
     private val sensorCollector = SensorCollector(context)
     private val sensorEncoder = SensorEncoder()
+    private val visionEncoder = VisionEncoder()
     private val fusionEngine = FusionEngine()
 
     val textEncoderLabel: String
@@ -30,6 +33,7 @@ class RecommendationPipeline(
 
     suspend fun runPipeline(
         input: String,
+        imageBitmap: Bitmap? = null,
         onStepUpdate: (InferenceSteps) -> Unit
     ): RecommendationResult {
         var steps = InferenceSteps()
@@ -44,12 +48,21 @@ class RecommendationPipeline(
             onStepUpdate(steps)
 
             delay(120)
+            val visionEmbedding = imageBitmap?.let { bitmap ->
+                val embedding = visionEncoder.encode(bitmap)
+                steps = steps.copy(visionEncoded = true)
+                onStepUpdate(steps)
+                embedding
+            }
+
+            delay(120)
             val sensorSample = sensorCollector.getLatestSample()
             val sensorEmbedding = sensorEncoder.encode(sensorSample)
 
             delay(120)
             val fusedEmbedding = fusionEngine.fuse(
                 textEmbedding = textEmbedding,
+                visionEmbedding = visionEmbedding,
                 sensorEmbedding = sensorEmbedding
             )
             steps = steps.copy(fused = true)
@@ -75,7 +88,8 @@ class RecommendationPipeline(
             }
             return RecommendationResult(
                 recommendations = recommendations,
-                inferenceTimeMs = inferenceMs
+                inferenceTimeMs = inferenceMs,
+                usedVisionInput = imageBitmap != null
             )
         } finally {
             sensorCollector.stop()

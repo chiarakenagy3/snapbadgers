@@ -60,6 +60,7 @@ fun RecommendationCard(
                 KeyValueRow("Artist", topRecommendation.artist)
                 KeyValueRow("Similarity", "%.3f".format(topRecommendation.similarity))
                 KeyValueRow("Inference time", "${result.inferenceTimeMs} ms")
+                KeyValueRow("Photo input", if (result.usedVisionInput) "Attached" else "Not attached")
                 KeyValueRow(
                     "Text encoder",
                     if (isModelBackedEncoder) encoderLabel else "$encoderLabel (fallback)"

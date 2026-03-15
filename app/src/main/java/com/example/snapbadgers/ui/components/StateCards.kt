@@ -30,7 +30,7 @@ fun EmptyResultHint() {
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Enter a short description and press Recommend.",
+                text = "Enter a short description, attach an optional photo, and press Recommend.",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -38,7 +38,7 @@ fun EmptyResultHint() {
 }
 
 @Composable
-fun LoadingResultHint(encoderLabel: String) {
+fun LoadingResultHint(encoderLabel: String, hasVisionInput: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)
@@ -59,6 +59,10 @@ fun LoadingResultHint(encoderLabel: String) {
             )
             Text(
                 text = "Text encoder: $encoderLabel",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "Photo input: ${if (hasVisionInput) "attached" else "not attached"}",
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -85,7 +89,7 @@ fun ErrorCard(message: String) {
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "Tip: Make sure the input is not empty. Later, model or network errors can be shown here too.",
+                text = "Tip: Add text, a photo, or both before running the demo.",
                 style = MaterialTheme.typography.bodySmall
             )
         }

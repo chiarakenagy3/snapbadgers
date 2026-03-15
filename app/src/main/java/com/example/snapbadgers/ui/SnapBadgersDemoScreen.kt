@@ -1,5 +1,6 @@
 package com.example.snapbadgers.ui
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.UiState
+import com.example.snapbadgers.ui.components.CameraInputCard
 import com.example.snapbadgers.ui.components.EmptyResultHint
 import com.example.snapbadgers.ui.components.ErrorCard
 import com.example.snapbadgers.ui.components.Header
@@ -44,6 +46,7 @@ fun SnapBadgersDemoScreen() {
     val pipeline = remember(context) { RecommendationPipeline(context) }
 
     var input by remember { mutableStateOf("") }
+    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var state by remember { mutableStateOf<UiState>(UiState.Idle) }
     var steps by remember { mutableStateOf(InferenceSteps()) }
 
@@ -51,7 +54,8 @@ fun SnapBadgersDemoScreen() {
     val encoderLabel = pipeline.textEncoderLabel
     val isModelBackedEncoder = pipeline.isModelBackedTextEncoder
     val isLoading = state is UiState.Loading
-    val canSubmit = input.isNotBlank() && !isLoading
+    val hasVisionInput = capturedBitmap != null
+    val canSubmit = (input.isNotBlank() || hasVisionInput) && !isLoading
 
     Column(
         modifier = Modifier
@@ -97,8 +101,8 @@ fun SnapBadgersDemoScreen() {
                     Button(
                         onClick = {
                             scope.launch {
-                                if (input.isBlank()) {
-                                    state = UiState.Error("Please enter a vibe description.")
+                                if (input.isBlank() && capturedBitmap == null) {
+                                    state = UiState.Error("Please enter a vibe description or capture a photo.")
                                     return@launch
                                 }
 
@@ -108,6 +112,7 @@ fun SnapBadgersDemoScreen() {
                                 try {
                                     val result = pipeline.runPipeline(
                                         input = input,
+                                        imageBitmap = capturedBitmap,
                                         onStepUpdate = { updatedSteps ->
                                             steps = updatedSteps
                                         }
@@ -127,6 +132,7 @@ fun SnapBadgersDemoScreen() {
                     OutlinedButton(
                         onClick = {
                             input = ""
+                            capturedBitmap = null
                             steps = InferenceSteps()
                             state = UiState.Idle
                         },
@@ -148,16 +154,29 @@ fun SnapBadgersDemoScreen() {
             }
         }
 
+        CameraInputCard(
+            capturedBitmap = capturedBitmap,
+            enabled = !isLoading,
+            onBitmapCaptured = { bitmap ->
+                capturedBitmap = bitmap
+                if (state is UiState.Error) state = UiState.Idle
+            }
+        )
+
         InferenceStatusCard(
             steps = steps,
             isLoading = isLoading,
             encoderLabel = encoderLabel,
-            isModelBackedEncoder = isModelBackedEncoder
+            isModelBackedEncoder = isModelBackedEncoder,
+            hasVisionInput = hasVisionInput
         )
 
         when (val s = state) {
             is UiState.Idle -> EmptyResultHint()
-            is UiState.Loading -> LoadingResultHint(encoderLabel = encoderLabel)
+            is UiState.Loading -> LoadingResultHint(
+                encoderLabel = encoderLabel,
+                hasVisionInput = hasVisionInput
+            )
             is UiState.Success -> RecommendationCard(
                 result = s.result,
                 encoderLabel = encoderLabel,

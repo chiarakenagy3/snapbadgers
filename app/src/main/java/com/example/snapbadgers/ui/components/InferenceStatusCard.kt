@@ -21,7 +21,8 @@ fun InferenceStatusCard(
     steps: InferenceSteps,
     isLoading: Boolean,
     encoderLabel: String,
-    isModelBackedEncoder: Boolean
+    isModelBackedEncoder: Boolean,
+    hasVisionInput: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -60,16 +61,24 @@ fun InferenceStatusCard(
                 style = MaterialTheme.typography.bodySmall
             )
 
-            StepRow("Text encoding", steps.textEncoded)
-            StepRow("Fusion", steps.fused)
-            StepRow("Projection", steps.projected)
-            StepRow("Similarity search", steps.ranked)
+            StepRow("Text encoding", status = if (steps.textEncoded) "Done" else "Pending")
+            StepRow(
+                "Vision encoding",
+                status = when {
+                    !hasVisionInput -> "Skipped"
+                    steps.visionEncoded -> "Done"
+                    else -> "Pending"
+                }
+            )
+            StepRow("Fusion", status = if (steps.fused) "Done" else "Pending")
+            StepRow("Projection", status = if (steps.projected) "Done" else "Pending")
+            StepRow("Similarity search", status = if (steps.ranked) "Done" else "Pending")
         }
     }
 }
 
 @Composable
-fun StepRow(label: String, done: Boolean) {
+fun StepRow(label: String, status: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -77,7 +86,7 @@ fun StepRow(label: String, done: Boolean) {
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
         Text(
-            text = if (done) "Done" else "Pending",
+            text = status,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )

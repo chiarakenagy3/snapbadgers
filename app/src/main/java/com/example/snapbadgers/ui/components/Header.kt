@@ -31,7 +31,7 @@ fun Header() {
             )
 
             Text(
-                text = "Integration demo: text + sensor -> top 3 songs",
+                text = "Integration demo: text + optional photo + sensor -> top 3 songs",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
