@@ -15,19 +15,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-public fun EmptyResultHint() {
+fun EmptyResultHint() {
     Card(
-        modifier = Modifier.Companion.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.Companion.padding(14.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = "No recommendation yet",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Companion.SemiBold
+                fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = "Enter a short description and press Recommend.",
@@ -38,50 +38,54 @@ public fun EmptyResultHint() {
 }
 
 @Composable
-public fun LoadingResultHint() {
+fun LoadingResultHint(encoderLabel: String) {
     Card(
-        modifier = Modifier.Companion.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.Companion.padding(14.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "Working…",
+                text = "Working...",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Companion.SemiBold
+                fontWeight = FontWeight.SemiBold
             )
-            LinearProgressIndicator(modifier = Modifier.Companion.fillMaxWidth())
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Text(
-                text = "Running on-device inference steps (stub).",
+                text = "Running on-device inference steps.",
                 style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Text encoder: $encoderLabel",
+                style = MaterialTheme.typography.bodySmall
             )
         }
     }
 }
 
 @Composable
-public fun ErrorCard(message: String) {
+fun ErrorCard(message: String) {
     Card(
-        modifier = Modifier.Companion.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.Companion.padding(14.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "⚠️ Error",
+                text = "Error",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Companion.SemiBold
+                fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "Tip: Make sure the input is not empty. Later, network/model errors can be shown here too.",
+                text = "Tip: Make sure the input is not empty. Later, model or network errors can be shown here too.",
                 style = MaterialTheme.typography.bodySmall
             )
         }

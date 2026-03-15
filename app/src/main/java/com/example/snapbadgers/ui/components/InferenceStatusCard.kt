@@ -17,32 +17,48 @@ import androidx.compose.ui.unit.dp
 import com.example.snapbadgers.model.InferenceSteps
 
 @Composable
-fun InferenceStatusCard(steps: InferenceSteps, isLoading: Boolean) {
+fun InferenceStatusCard(
+    steps: InferenceSteps,
+    isLoading: Boolean,
+    encoderLabel: String,
+    isModelBackedEncoder: Boolean
+) {
     Card(
-        modifier = Modifier.Companion.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.Companion.padding(14.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
-                modifier = Modifier.Companion.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Companion.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Inference Pipeline",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Companion.SemiBold
+                    fontWeight = FontWeight.SemiBold
                 )
-
-                // Status pill text (simple, readable for demos).
                 Text(
                     text = if (isLoading) "RUNNING" else "READY",
                     style = MaterialTheme.typography.labelMedium
                 )
             }
+
+            Text(
+                text = "Text encoder: $encoderLabel",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = if (isModelBackedEncoder) {
+                    "Mode: model-backed"
+                } else {
+                    "Mode: fallback stub"
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
 
             StepRow("Text encoding", steps.textEncoded)
             StepRow("Fusion", steps.fused)
@@ -55,15 +71,15 @@ fun InferenceStatusCard(steps: InferenceSteps, isLoading: Boolean) {
 @Composable
 fun StepRow(label: String, done: Boolean) {
     Row(
-        modifier = Modifier.Companion.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Companion.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
         Text(
-            text = if (done) "✓" else "—",
+            text = if (done) "Done" else "Pending",
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Companion.SemiBold
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

@@ -6,9 +6,10 @@ import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
 import com.example.snapbadgers.ai.text.TextEncoder
 import com.example.snapbadgers.ai.text.TextEncoderFactory
+import com.example.snapbadgers.ai.text.TextEncoderMode
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
-import com.example.snapbadgers.model.Song
+import com.example.snapbadgers.model.RecommendationResult
 import kotlinx.coroutines.delay
 
 class RecommendationPipeline(
@@ -21,10 +22,16 @@ class RecommendationPipeline(
     private val sensorEncoder = SensorEncoder()
     private val fusionEngine = FusionEngine()
 
+    val textEncoderLabel: String
+        get() = textEncoder.label
+
+    val isModelBackedTextEncoder: Boolean
+        get() = textEncoder.mode == TextEncoderMode.MODEL
+
     suspend fun runPipeline(
         input: String,
         onStepUpdate: (InferenceSteps) -> Unit
-    ): Song {
+    ): RecommendationResult {
         var steps = InferenceSteps()
         val startMs = System.currentTimeMillis()
 
@@ -55,14 +62,27 @@ class RecommendationPipeline(
             onStepUpdate(steps)
 
             delay(160)
-            val song = songRepository.findTopSong(projectedEmbedding)
+            val rankedSongs = songRepository.findTopSongs(
+                queryEmbedding = projectedEmbedding,
+                limit = RECOMMENDATION_LIMIT
+            )
             steps = steps.copy(ranked = true)
             onStepUpdate(steps)
 
             val inferenceMs = System.currentTimeMillis() - startMs
-            return song.copy(inferenceTimeMs = inferenceMs)
+            val recommendations = rankedSongs.map { song ->
+                song.copy(inferenceTimeMs = inferenceMs)
+            }
+            return RecommendationResult(
+                recommendations = recommendations,
+                inferenceTimeMs = inferenceMs
+            )
         } finally {
             sensorCollector.stop()
         }
+    }
+
+    private companion object {
+        const val RECOMMENDATION_LIMIT = 3
     }
 }

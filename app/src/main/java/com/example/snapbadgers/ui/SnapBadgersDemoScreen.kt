@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -46,13 +48,15 @@ fun SnapBadgersDemoScreen() {
     var steps by remember { mutableStateOf(InferenceSteps()) }
 
     val scope = rememberCoroutineScope()
-
+    val encoderLabel = pipeline.textEncoderLabel
+    val isModelBackedEncoder = pipeline.isModelBackedTextEncoder
     val isLoading = state is UiState.Loading
     val canSubmit = input.isNotBlank() && !isLoading
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -78,7 +82,7 @@ fun SnapBadgersDemoScreen() {
                         input = it
                         if (state is UiState.Error) state = UiState.Idle
                     },
-                    label = { Text("e.g., calm rainy night, focused studying…") },
+                    label = { Text("e.g., calm rainy night, focused studying") },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading,
                     singleLine = false,
@@ -102,13 +106,13 @@ fun SnapBadgersDemoScreen() {
                                 state = UiState.Loading
 
                                 try {
-                                    val song = pipeline.runPipeline(
+                                    val result = pipeline.runPipeline(
                                         input = input,
                                         onStepUpdate = { updatedSteps ->
                                             steps = updatedSteps
                                         }
                                     )
-                                    state = UiState.Success(song)
+                                    state = UiState.Success(result)
                                 } catch (e: Exception) {
                                     state = UiState.Error(e.message ?: "Unknown error")
                                 }
@@ -144,12 +148,21 @@ fun SnapBadgersDemoScreen() {
             }
         }
 
-        InferenceStatusCard(steps = steps, isLoading = isLoading)
+        InferenceStatusCard(
+            steps = steps,
+            isLoading = isLoading,
+            encoderLabel = encoderLabel,
+            isModelBackedEncoder = isModelBackedEncoder
+        )
 
         when (val s = state) {
             is UiState.Idle -> EmptyResultHint()
-            is UiState.Loading -> LoadingResultHint()
-            is UiState.Success -> RecommendationCard(song = s.song)
+            is UiState.Loading -> LoadingResultHint(encoderLabel = encoderLabel)
+            is UiState.Success -> RecommendationCard(
+                result = s.result,
+                encoderLabel = encoderLabel,
+                isModelBackedEncoder = isModelBackedEncoder
+            )
             is UiState.Error -> ErrorCard(message = s.message)
         }
     }

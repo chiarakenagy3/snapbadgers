@@ -3,7 +3,11 @@ package com.example.snapbadgers.ai.text
 import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 
-class StubTextEncoder : TextEncoder {
+class StubTextEncoder(
+    override val label: String = "Stub heuristic encoder"
+) : TextEncoder {
+
+    override val mode: TextEncoderMode = TextEncoderMode.STUB
 
     override suspend fun encode(text: String): FloatArray {
         // TODO: Replace with real tokenizer + TFLite model inference

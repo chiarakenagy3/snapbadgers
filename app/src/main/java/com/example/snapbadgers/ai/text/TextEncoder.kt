@@ -5,21 +5,24 @@ import android.util.Log
 import com.example.snapbadgers.ai.text.ml.BertTokenizer
 import com.example.snapbadgers.ai.text.ml.QualcommTextEncoder
 
+enum class TextEncoderMode {
+    STUB,
+    MODEL
+}
+
 interface TextEncoder {
+    val mode: TextEncoderMode
+    val label: String
     suspend fun encode(text: String): FloatArray
 }
 
 object TextEncoderFactory {
     fun create(context: Context): TextEncoder {
-        return createModelBackedEncoder(context) ?: StubTextEncoder()
-    }
-
-    private fun createModelBackedEncoder(context: Context): TextEncoder? {
         if (!hasAsset(context, MODEL_ASSET) || !hasAsset(context, VOCAB_ASSET)) {
-            return null
+            return StubTextEncoder("Stub heuristic encoder (model assets missing)")
         }
 
-        return runCatching {
+        return runCatching<TextEncoder> {
             val appContext = context.applicationContext
             val tokenizer = BertTokenizer.load(appContext, VOCAB_ASSET)
             QualcommTextEncoder(
@@ -29,7 +32,9 @@ object TextEncoderFactory {
             )
         }.onFailure {
             Log.w(TAG, "Falling back to StubTextEncoder", it)
-        }.getOrNull()
+        }.getOrElse {
+            StubTextEncoder("Stub heuristic encoder (model init failed)")
+        }
     }
 
     private fun hasAsset(context: Context, assetName: String): Boolean {

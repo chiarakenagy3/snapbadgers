@@ -42,15 +42,19 @@ class SongRepository(context: Context) {
 
     fun getAllSongs(): List<Song> = embeddedSongs.ifEmpty { fallbackSongs }
 
-    fun findTopSong(queryEmbedding: FloatArray): Song {
+    fun findTopSongs(queryEmbedding: FloatArray, limit: Int = DEFAULT_RECOMMENDATION_LIMIT): List<Song> {
         val normalizedQuery = VectorUtils.alignToEmbeddingDimension(queryEmbedding, salt = QUERY_SALT)
-        val songs = candidateSongs()
-        val bestSong = songs.maxByOrNull { song ->
-            similarity(normalizedQuery, song.embedding)
-        } ?: songs.first()
+        return candidateSongs()
+            .map { song ->
+                val score = similarity(normalizedQuery, song.embedding)
+                song.copy(similarity = score)
+            }
+            .sortedByDescending { it.similarity }
+            .take(limit.coerceAtLeast(1))
+    }
 
-        val score = similarity(normalizedQuery, bestSong.embedding)
-        return bestSong.copy(similarity = score)
+    fun findTopSong(queryEmbedding: FloatArray): Song {
+        return findTopSongs(queryEmbedding, limit = 1).first()
     }
 
     private fun candidateSongs(): List<Song> {
@@ -111,5 +115,6 @@ class SongRepository(context: Context) {
         const val TAG = "SongRepository"
         const val TRACKS_FEATURES_FILE = "tracks_features.json"
         const val QUERY_SALT = 101
+        const val DEFAULT_RECOMMENDATION_LIMIT = 3
     }
 }

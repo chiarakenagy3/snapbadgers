@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.ai.text.TextEncoder
+import com.example.snapbadgers.ai.text.TextEncoderMode
 import com.example.snapbadgers.ai.text.Tokenizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,6 +18,9 @@ class QualcommTextEncoder(
     private val tokenizer: Tokenizer,
     private val modelPath: String = "mobile_bert.tflite"
 ) : TextEncoder, AutoCloseable {
+
+    override val mode: TextEncoderMode = TextEncoderMode.MODEL
+    override val label: String = "Qualcomm MobileBERT (NNAPI)"
 
     private var interpreter: Interpreter? = null
     private var nnApiDelegate: NnApiDelegate? = null
