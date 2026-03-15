@@ -1,42 +1,98 @@
-# Snapbadgers
-This is the team project for Team Qualcomm in CS 620.
+# SnapBadgers: Multi-Modal AI Music Recommendation Engine
 
-Snapbadgers is an Android application that provides personalized music recommendations by fusing user text input with real-time sensor data using a simulated AI pipeline.
+SnapBadgers is a personalized music discovery system that bridges the gap between your Spotify library and your current environment. By fusing **Textual Context** (NLP) and **Real-time Motion** (Sensors), it finds the perfect match in your personal library using high-dimensional vector similarity.
 
-## 🚀 Features
+---
 
-- **Multi-modal Inference Pipeline**: Combines text descriptions and environmental sensor data (Accelerometer, Light) to generate recommendations.
-- **Sensor Integration**: Utilizes device sensors to capture the user's current "vibe" or environment.
-- **Song Repository**: Matches the fused embedding against a curated list of songs to find the best match.
-- **Jetpack Compose UI**: A modern, reactive interface that displays inference steps and recommendation results.
+## 🧩 Deep Technical Architecture
 
-## 🛠 Tech Stack
+### 1. Data Sync Phase: Building the Vector Index
+The app creates a personalized "Music Knowledge Base" by transforming listening history into a searchable vector space.
 
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose
-- **Asynchronous Programming**: Kotlin Coroutines
-- **Architecture**: Clean Architecture principles with distinct layers for Data, Model, AI Pipeline, and UI.
+*   **Spotify Integration**: Uses the `/v1/me/top/tracks` endpoint to fetch the user's `medium_term` (6 months) top 20 tracks.
+*   **Acoustic Feature Extraction**: Since Spotify API doesn't provide raw waveforms, SnapBadgers queries the **ReccoBeats API** (`/v1/audio-features/{id}`) for 10 structural features:
+    *   *Tempo, Loudness, Danceability, Energy, Acousticness, Valence, etc.*
+*   **Vectorization Strategy (`EmbeddingUtils`)**:
+    1.  **Normalization**: Loudness and Tempo are mapped to `[0, 1]` ranges.
+    2.  **Derived Features**: New features are calculated (e.g., `Danceability * Energy`) to capture non-linear relationships.
+    3.  **128-d Projection**: The base features are projected into a 128-dimensional space using a deterministic projection matrix (Sine-based) for consistency.
+    4.  **L2 Normalization**: Vectors are normalized to unit length so that **Dot Product** equals **Cosine Similarity**.
 
-## 📂 Project Structure
+### 2. Inference Pipeline: The Vibe Engine
+When a recommendation is requested, the system executes a real-time multi-modal pipeline:
 
-- `ai/`: Contains the logic for text encoding, sensor data collection, and the fusion engine.
-- `data/`: Manages song data and similarity calculations.
-- `model/`: Defines core data structures like `Song`, `UiState`, and `InferenceSteps`.
-- `ui/`: Compose-based screens and components.
+*   **Text Encoding (NLP)**:
+    *   **Model**: MobileBERT (Qualcomm-optimized TFLite).
+    *   **Process**: Tokenizes text prompt -> BERT Inference -> CLS token extraction -> 128-d Vector.
+*   **Sensor Encoding (Motion)**:
+    *   **Sensors**: Accelerometer + Gyroscope (100Hz).
+    *   **Process**: Collects a 1-second window -> Statistical Feature Extraction -> 128-d Vector representing "Activity Intensity".
+*   **Vector Fusion (`FusionEngine`)**:
+    *   **Method**: **Concatenation Fusion**.
+    *   The system joins the Text and Sensor vectors into a unified context representation.
+*   **Similarity Search (`RecommendationService`)**:
+    *   **Math**: `Score = DotProduct(FusedVector, SongVector)`.
+    *   Calculates the score for all 20 songs in the local index in parallel.
 
-## ⚙️ How it Works
+---
 
-1. **Input**: User enters a text description (e.g., "Chill evening").
-2. **Sensor Collection**: The app collects brief samples from the accelerometer and light sensor.
-3. **Encoding**: Both text and sensor data are transformed into numerical embeddings.
-4. **Fusion**: The `FusionEngine` merges these embeddings into a single representation.
-5. **Recommendation**: The `SongRepository` performs a similarity search to find the most appropriate song.
+## 📥 Data Schema: `tracks_features.json`
 
-## 📝 Setup
+The local database is stored in the app's internal `/files` directory with the following structure:
 
-1. Clone the repository.
-2. Open the project in Android Studio (Iguana or newer recommended).
-3. Ensure you have the Android SDK installed.
-4. Build and run on a physical device or emulator.
+```json
+[
+  {
+    "trackId": "4pmc2WpYvCu7H9Yv9dy",
+    "name": "Anti-Hero",
+    "artists": "Taylor Swift",
+    "source": "MySpotify",
+    "embedding": [0.123, -0.456, 0.789, ...] // 128 floats
+  }
+]
+```
 
-*Note: This project uses `android.overridePathCheck=true` in `gradle.properties` to support build paths containing non-ASCII characters.*
+---
+
+## 🛠 Usage Instructions
+
+### 1. Developer Setup
+Configure `local.properties` with your Spotify Developer App credentials:
+
+```properties
+SPOTIFY_CLIENT_ID=your_id
+SPOTIFY_CLIENT_SECRET=your_secret
+SPOTIFY_REFRESH_TOKEN=your_token
+```
+
+### 2. Initialization & Sync
+1.  **Launch**: Open the main screen.
+2.  **Auth**: App refreshes the Spotify Access Token automatically.
+3.  **Sync**: 
+    *   Fetches Top Tracks from Spotify.
+    *   Requests features from `api.reccobeats.com`.
+4.  **Status Check**: Wait until the log shows: `✓ Recommendations are now based on YOUR Spotify tracks`.
+
+### 3. Running a Vibe Check
+1.  Go to the **Recommendation Screen**.
+2.  **Prompt**: Enter your current mood (e.g., "Late night coding session").
+3.  **Action**: Tap **"Run AI Pipeline"**.
+4.  **Result**: The app returns the song from your Top 20 that best matches the combined energy of your prompt and your current physical movement.
+
+---
+
+## 📂 Key Source Components
+
+| Component | Responsibility |
+| :--- | :--- |
+| `RecommendationPipeline.kt` | Orchestrates the sync, library loading, and inference steps. |
+| `ReccoBeatsApi.kt` | High-latency network calls for structural audio analysis. |
+| `RecommendationService.kt` | The mathematical engine for 128-d Dot Product ranking. |
+| `EmbeddingUtils.kt` | Deterministic projection logic for 128-d vector space consistency. |
+
+---
+
+## ⚠️ Troubleshooting & Limits
+*   **ReccoBeats DB**: If your Spotify song is very new or rare, ReccoBeats may return `404`. The app will skip these songs automatically.
+*   **Wait for Sync**: The Recommendation Screen will show "Library Sync Required" if you haven't completed the sync on the main screen since the last app install.
+*   **Model Accuracy**: On-device MobileBERT requires specific `vocab.txt` and `mobile_bert.tflite` files in the `assets/` folder to function correctly.
