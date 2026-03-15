@@ -23,11 +23,13 @@ __pycache__/
 
 # ML Assets & AI Hub
 *.onnx
-*.tflite
 *.pb
 /export_assets/
 /vision_export_assets/
 .qai_hub/
+
+# Whitelist production models for teammate sharing
+!app/src/main/assets/*.tflite
 
 # Agent Context
 agent_context/
