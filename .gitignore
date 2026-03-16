@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local build and environment
+venv/
+export_assets/
+*.tflite
+
+# Agent Context
+agent_context/
