@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,6 +17,13 @@ val localProperties = Properties().apply {
 fun getQuotedProperty(key: String): String {
     val value = localProperties.getProperty(key)?.removeSurrounding("\"")?.removeSurrounding("'") ?: ""
     return "\"$value\""
+}
+
+if (projectDir.absolutePath.any { it.code > 127 }) {
+    // Keep build outputs on an ASCII-only path so Gradle/JUnit workers can resolve classes on Windows.
+    layout.buildDirectory.set(
+        file("${System.getProperty("user.home")}\\.snapbadgers-build\\app")
+    )
 }
 
 android {
@@ -65,6 +73,9 @@ android {
             useLegacyPackaging = true
         }
     }
+    androidResources {
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -96,4 +107,12 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testDebugUnitTest") {
+        val kotlinUnitTestClasses = files(layout.buildDirectory.dir("tmp/kotlin-classes/debugUnitTest"))
+        testClassesDirs = files(testClassesDirs, kotlinUnitTestClasses)
+        classpath = classpath.plus(kotlinUnitTestClasses)
+    }
 }

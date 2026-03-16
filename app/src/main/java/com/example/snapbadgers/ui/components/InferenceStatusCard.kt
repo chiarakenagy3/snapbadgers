@@ -17,53 +17,78 @@ import androidx.compose.ui.unit.dp
 import com.example.snapbadgers.model.InferenceSteps
 
 @Composable
-fun InferenceStatusCard(steps: InferenceSteps, isLoading: Boolean) {
+fun InferenceStatusCard(
+    steps: InferenceSteps,
+    isLoading: Boolean,
+    encoderLabel: String,
+    isModelBackedEncoder: Boolean,
+    hasVisionInput: Boolean
+) {
     Card(
-        modifier = Modifier.Companion.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.Companion.padding(14.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
-                modifier = Modifier.Companion.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Companion.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Inference Pipeline",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Companion.SemiBold
+                    fontWeight = FontWeight.SemiBold
                 )
-
-                // Status pill text (simple, readable for demos).
                 Text(
                     text = if (isLoading) "RUNNING" else "READY",
                     style = MaterialTheme.typography.labelMedium
                 )
             }
 
-            StepRow("Text encoding", steps.textEncoded)
-            StepRow("Fusion", steps.fused)
-            StepRow("Projection", steps.projected)
-            StepRow("Similarity search", steps.ranked)
+            Text(
+                text = "Text encoder: $encoderLabel",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = if (isModelBackedEncoder) {
+                    "Mode: model-backed"
+                } else {
+                    "Mode: fallback stub"
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            StepRow("Text encoding", status = if (steps.textEncoded) "Done" else "Pending")
+            StepRow(
+                "Vision encoding",
+                status = when {
+                    !hasVisionInput -> "Skipped"
+                    steps.visionEncoded -> "Done"
+                    else -> "Pending"
+                }
+            )
+            StepRow("Fusion", status = if (steps.fused) "Done" else "Pending")
+            StepRow("Projection", status = if (steps.projected) "Done" else "Pending")
+            StepRow("Similarity search", status = if (steps.ranked) "Done" else "Pending")
         }
     }
 }
 
 @Composable
-fun StepRow(label: String, done: Boolean) {
+fun StepRow(label: String, status: String) {
     Row(
-        modifier = Modifier.Companion.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Companion.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
         Text(
-            text = if (done) "✓" else "—",
+            text = status,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Companion.SemiBold
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
