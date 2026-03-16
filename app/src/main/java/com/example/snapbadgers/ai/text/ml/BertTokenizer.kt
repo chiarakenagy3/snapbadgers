@@ -11,13 +11,17 @@ class BertTokenizer(
 ) : Tokenizer {
 
     private val unknownToken = "[UNK]"
+    private val clsToken = "[CLS]"
+    private val sepToken = "[SEP]"
     private val maxInputCharsPerWord = 100
 
     override fun tokenize(text: String): IntArray {
         val tokens = mutableListOf<Int>()
-        val cleanedText = if (doLowerCase) text.lowercase() else text
         
-        // Basic whitespace splitting
+        // BERT models require [CLS] at the start
+        vocab[clsToken]?.let { tokens.add(it) }
+        
+        val cleanedText = if (doLowerCase) text.lowercase() else text
         val words = cleanedText.trim().split(Regex("\\s+"))
         
         for (word in words) {
@@ -53,7 +57,7 @@ class BertTokenizer(
                 start = end
             }
         }
-        
+
         return tokens.toIntArray()
     }
 

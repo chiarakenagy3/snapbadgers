@@ -14,8 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
 import com.example.snapbadgers.ai.songembeddings.embedding.getEmbedding
 import com.example.snapbadgers.ai.songembeddings.network.*
+import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.Song
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -49,8 +51,15 @@ class MainActivity : ComponentActivity() {
 
         var statusText by mutableStateOf("Ready")
         var logText by mutableStateOf("")
-        var recommendations by mutableStateOf<List<RecommendationService.RecommendationResult>>(emptyList())
-        var recommendationService: RecommendationService? by mutableStateOf(null)
+        
+        // Recommendation States
+        var vibeInput by mutableStateOf("")
+        var isProcessing by mutableStateOf(false)
+        var recommendedSong by mutableStateOf<Song?>(null)
+        var stepsProgress by mutableStateOf(InferenceSteps())
+        
+        // AI Pipeline instance
+        val pipeline = RecommendationPipeline(this)
 
         setContent {
             Column(
@@ -64,49 +73,94 @@ class MainActivity : ComponentActivity() {
                 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                if (recommendationService != null) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("2. Recommendations Loaded", style = MaterialTheme.typography.titleMedium)
-                            Text("Your personalized library is active.", style = MaterialTheme.typography.bodySmall)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            Button(
-                                onClick = {
-                                    val mockVibe = FloatArray(128) { (0..100).random() / 100f }
-                                    recommendations = recommendationService?.recommendSongs(
-                                        userEmbedding = mockVibe,
-                                        userWeight = 1.0f,
-                                        limit = 5
-                                    ) ?: emptyList()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Recommend Songs Based on My Vibes")
+                // AI Vibe Search Section
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    val modelExists = assets.list("")?.contains("mobile_bert.tflite") == true
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("2. AI Recommendation Engine", style = MaterialTheme.typography.titleMedium)
+                        
+                        if (!modelExists) {
+                            Text(
+                                "⚠ Warning: mobile_bert.tflite missing!", 
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        OutlinedTextField(
+                            value = vibeInput,
+                            onValueChange = { vibeInput = it },
+                            label = { Text("What is your vibe?") },
+                            placeholder = { Text("e.g. Chill jazz night, Intense gym") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isProcessing
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Button(
+                            onClick = {
+                                lifecycleScope.launch {
+                                    isProcessing = true
+                                    recommendedSong = pipeline.runPipeline(vibeInput) { 
+                                        stepsProgress = it 
+                                    }
+                                    isProcessing = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = vibeInput.isNotEmpty() && !isProcessing && modelExists
+                        ) {
+                            if (isProcessing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Processing...")
+                            } else {
+                                Text("Find My Vibe Song")
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (recommendations.isNotEmpty()) {
-                    Text("Top 5 Recommendations:", style = MaterialTheme.typography.titleMedium)
-                    recommendations.forEach { res ->
-                        ListItem(
-                            headlineContent = { Text(res.song.title) },
-                            supportingContent = { Text("${res.song.artist} | Score: ${(res.finalScore * 100).toInt()}%") },
-                            trailingContent = { Text("Match: %.2f".format(res.finalScore)) }
-                        )
-                        HorizontalDivider()
+                if (recommendedSong != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Top Recommendation:", style = MaterialTheme.typography.titleMedium)
+                    ListItem(
+                        headlineContent = { Text(recommendedSong!!.title) },
+                        supportingContent = { 
+                            Text("${recommendedSong!!.artist} | Latency: ${recommendedSong!!.inferenceTimeMs}ms") 
+                        },
+                        trailingContent = { 
+                            if (recommendedSong!!.similarity > 0) {
+                                Text("Score: %.2f".format(recommendedSong!!.similarity))
+                            }
+                        }
+                    )
+                    
+                    // Simple progress bar for AI steps
+                    val progressValue = when {
+                        stepsProgress.ranked -> 1f
+                        stepsProgress.fused -> 0.75f
+                        stepsProgress.textEncoded -> 0.4f
+                        else -> 0.1f
                     }
+                    LinearProgressIndicator(
+                        progress = { progressValue },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                Text("Real-time Logs:", style = MaterialTheme.typography.titleSmall)
+                Text("Execution Log:", style = MaterialTheme.typography.titleSmall)
                 Text(logText, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
         }
@@ -123,63 +177,43 @@ class MainActivity : ComponentActivity() {
             .baseUrl("https://accounts.spotify.com/").client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create()).build().create(AuthApi::class.java)
 
-        val reccoApi = Retrofit.Builder()
+        val reccoBeatsApi = Retrofit.Builder()
             .baseUrl(reccoBeatsBaseUrl).client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create()).build().create(ReccoBeatsApi::class.java)
 
+        // Library Sync logic
         lifecycleScope.launch {
             try {
-                // 1. Authenticate
-                statusText = "Connecting to Spotify..."
+                statusText = "Syncing with Spotify..."
                 val authHeader = "Basic " + Base64.encodeToString("${BuildConfig.SPOTIFY_CLIENT_ID}:${BuildConfig.SPOTIFY_CLIENT_SECRET}".toByteArray(), Base64.NO_WRAP)
                 val tokenResponse = authApi.refreshToken(authHeader, "refresh_token", BuildConfig.SPOTIFY_REFRESH_TOKEN.trim())
                 val spotifyToken = "Bearer ${tokenResponse.access_token}"
 
-                // 2. Fetch YOUR real songs
-                statusText = "Fetching your Top Tracks..."
                 val tracksToProcess = mutableListOf<Triple<String, String, String>>() 
                 val topResponse = spotifyApi.getTopTracks(spotifyToken, "medium_term", 20)
-                
-                topResponse.items.forEach { 
-                    tracksToProcess.add(Triple(it.id, it.name, it.artists.joinToString(", ") { a -> a.name })) 
-                }
-                logText += "✓ Found ${tracksToProcess.size} tracks on your Spotify.\n"
+                topResponse.items.forEach { tracksToProcess.add(Triple(it.id, it.name, it.artists.joinToString(", ") { a -> a.name })) }
 
-                // 3. Extract Features for YOUR songs
                 statusText = "Analyzing audio features..."
                 val semaphore = Semaphore(5)
                 val finalResults = tracksToProcess.map { (id, name, artist) ->
                     async(Dispatchers.IO) {
                         semaphore.withPermit {
                             try {
-                                val features = reccoApi.getTrackFeatures(id)
+                                val features = reccoBeatsApi.getTrackFeatures(id)
                                 val embeddingArray = getEmbedding(features)
                                 withContext(Dispatchers.Main) { logText += "✓ Analyzed: $name\n" }
-                                ProcessedTrack(id, name, artist, "MySpotify", embeddingArray.toList())
+                                ProcessedTrack(id, name, artist, "Spotify", embeddingArray.toList())
                             } catch (e: Exception) { null }
                         }
                     }
                 }.awaitAll().filterNotNull()
 
-                // 4. Fallback only if needed
-                var activeResults = finalResults
-                if (activeResults.isEmpty()) {
-                    logText += "! No features found for your tracks. Using fallback data.\n"
-                    // ... Fallback logic remains here if desired ...
-                }
-
-                // 5. Update Recommendation Service with YOUR songs
-                statusText = "Updating Recommendation Engine..."
-                val songLibrary = activeResults.map { 
-                    Song(title = it.name, artist = it.artists, embedding = it.embedding.toFloatArray())
-                }
-                
-                if (songLibrary.isNotEmpty()) {
-                    recommendationService = RecommendationService(songLibrary)
-                    statusText = "Success! Library Updated."
+                if (finalResults.isNotEmpty()) {
+                    val json = Gson().toJson(finalResults)
+                    val file = File(filesDir, "tracks_features.json")
+                    withContext(Dispatchers.IO) { file.writeText(json) }
+                    statusText = "Ready! Library Loaded (${finalResults.size} songs)"
                     logText += "✓ Recommendations are now based on YOUR Spotify tracks.\n"
-                } else {
-                    statusText = "Error: Library Empty."
                 }
 
             } catch (e: Exception) {

@@ -19,20 +19,13 @@ The app creates a personalized "Music Knowledge Base" by transforming listening 
     4.  **L2 Normalization**: Vectors are normalized to unit length so that **Dot Product** equals **Cosine Similarity**.
 
 ### 2. Inference Pipeline: The Vibe Engine
-When a recommendation is requested, the system executes a real-time multi-modal pipeline:
-
-*   **Text Encoding (NLP)**:
-    *   **Model**: MobileBERT (Qualcomm-optimized TFLite).
-    *   **Process**: Tokenizes text prompt -> BERT Inference -> CLS token extraction -> 128-d Vector.
-*   **Sensor Encoding (Motion)**:
-    *   **Sensors**: Accelerometer + Gyroscope (100Hz).
-    *   **Process**: Collects a 1-second window -> Statistical Feature Extraction -> 128-d Vector representing "Activity Intensity".
+*   **Text Encoding (NLP)**: Uses **MobileBERT** to convert text prompts into a 128-d semantic vector.
+*   **Sensor Encoding (Motion)**: Converts 1-second motion windows into a 128-d activity intensity vector.
 *   **Vector Fusion (`FusionEngine`)**:
-    *   **Method**: **Concatenation Fusion**.
-    *   The system joins the Text and Sensor vectors into a unified context representation.
-*   **Similarity Search (`RecommendationService`)**:
-    *   **Math**: `Score = DotProduct(FusedVector, SongVector)`.
-    *   Calculates the score for all 20 songs in the local index in parallel.
+    *   **Method**: **Weighted Element-wise Fusion** (Replaced Concatenation).
+    *   **Math**: `Fused[i] = (Text[i] * 0.6) + (Sensor[i] * 0.4)`.
+    *   This ensures the sensor data actively influences the final 128-d query vector.
+*   **Similarity Search**: Performs a search against your local `tracks_features.json` to find the nearest neighbor.
 
 ---
 
