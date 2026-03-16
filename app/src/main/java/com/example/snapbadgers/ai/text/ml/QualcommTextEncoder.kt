@@ -1,6 +1,7 @@
 package com.example.snapbadgers.ai.text.ml
 
 import android.content.Context
+import android.util.Log
 import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.ai.text.TextEncoder
@@ -36,7 +37,20 @@ class QualcommTextEncoder(
         options.addDelegate(nnApiDelegate)
 
         val modelBuffer = ModelLoader.loadMappedFile(context, modelPath)
-        interpreter = Interpreter(modelBuffer, options)
+        val currentInterpreter = Interpreter(modelBuffer, options)
+        require(currentInterpreter.inputTensorCount == EXPECTED_INPUT_TENSOR_COUNT) {
+            "Unsupported text model signature: expected $EXPECTED_INPUT_TENSOR_COUNT input tensor, found ${currentInterpreter.inputTensorCount}"
+        }
+        require(currentInterpreter.outputTensorCount >= 1) {
+            "Unsupported text model signature: no output tensors found"
+        }
+
+        val outputShape = currentInterpreter.getOutputTensor(0).shape()
+        require(outputShape.isNotEmpty() && outputShape.last() == outputDimension) {
+            "Unsupported text model output shape: ${outputShape.joinToString(prefix = "[", postfix = "]")}"
+        }
+
+        interpreter = currentInterpreter
     }
 
     override suspend fun encode(text: String): FloatArray = withContext(Dispatchers.Default) {
@@ -64,13 +78,32 @@ class QualcommTextEncoder(
             val outputBuffer = Array(1) { FloatArray(outputDimension) }
             interpreter?.run(inputBuffer, outputBuffer)
             return@withContext VectorUtils.normalize(outputBuffer[0])
-        } catch (_: Exception) {
-            FloatArray(outputDimension) { 0f }
+        } catch (exception: Exception) {
+            logWarning("Text model inference failed", exception)
+            throw exception
         }
     }
 
     override fun close() {
         interpreter?.close()
         nnApiDelegate?.close()
+    }
+
+    private fun logWarning(message: String, throwable: Throwable? = null) {
+        runCatching {
+            if (throwable == null) {
+                Log.w(TAG, message)
+            } else {
+                Log.w(TAG, message, throwable)
+            }
+        }.getOrElse {
+            val suffix = throwable?.let { ": ${it.message}" }.orEmpty()
+            System.err.println("$TAG: $message$suffix")
+        }
+    }
+
+    private companion object {
+        const val TAG = "QualcommTextEncoder"
+        const val EXPECTED_INPUT_TENSOR_COUNT = 1
     }
 }

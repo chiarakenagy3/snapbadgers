@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,10 @@ import kotlinx.coroutines.launch
 fun SnapBadgersDemoScreen() {
     val context = LocalContext.current
     val pipeline = remember(context) { RecommendationPipeline(context) }
+
+    LaunchedEffect(pipeline) {
+        pipeline.warmUp()
+    }
 
     var input by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
