@@ -17,22 +17,21 @@ fun Header() {
         Text(
             text = "SnapBadgers",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Companion.Bold
+            fontWeight = FontWeight.Bold
         )
 
         Row(
-            verticalAlignment = Alignment.Companion.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // On-device badge: important for your capstone requirement.
             AssistChip(
                 onClick = {},
-                label = { Text("⚡ On-device AI") },
+                label = { Text("On-device AI") },
                 enabled = false
             )
 
             Text(
-                text = "Sprint 1 demo: Text → Top-1 song",
+                text = "Integration demo: text + optional photo + sensor -> top 3 songs",
                 style = MaterialTheme.typography.bodyMedium
             )
         }

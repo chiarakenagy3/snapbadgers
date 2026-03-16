@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.snapbadgers.BuildConfig
+import com.example.snapbadgers.model.EmbeddedTrack
 import com.example.snapbadgers.songembeddings.embedding.MLPProjector
 import com.example.snapbadgers.songembeddings.embedding.getEmbedding
 import com.example.snapbadgers.songembeddings.network.AuthApi
@@ -32,14 +33,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-
-data class ProcessedTrack(
-    val trackId: String,
-    val name: String,
-    val artists: String,
-    val source: String,
-    val embedding: List<Float>
-)
 
 class MainActivity : ComponentActivity() {
 
@@ -145,7 +138,7 @@ class MainActivity : ComponentActivity() {
                                         updateLogMain("✓ [$label] ${foundTrack.trackTitle}")
                                         
                                         val artistName = foundTrack.artists?.firstOrNull()?.name ?: "Unknown"
-                                        ProcessedTrack(foundTrack.id, foundTrack.trackTitle, artistName, label, embedding)
+                                        EmbeddedTrack(foundTrack.id, foundTrack.trackTitle, artistName, label, embedding)
                                     } catch (e: Exception) { 
                                         Log.e(TAG, "Feature extraction error for ${foundTrack.trackTitle}: ${e.message}")
                                         null 
