@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.android.application)
@@ -18,6 +19,13 @@ fun getQuotedProperty(key: String): String {
     return "\"$value\""
 }
 
+if (projectDir.absolutePath.any { it.code > 127 }) {
+    // Keep build outputs on an ASCII-only path so Gradle/JUnit workers can resolve classes on Windows.
+    layout.buildDirectory.set(
+        file("${System.getProperty("user.home")}\\.snapbadgers-build\\app")
+    )
+}
+
 android {
     namespace = "com.example.snapbadgers"
     compileSdk = 36
@@ -30,13 +38,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Add variables for automated token management
         buildConfigField("String", "SPOTIFY_TOKEN", getQuotedProperty("spotify.token"))
         buildConfigField("String", "SPOTIFY_CLIENT_ID", getQuotedProperty("spotify.client.id"))
         buildConfigField("String", "SPOTIFY_CLIENT_SECRET", getQuotedProperty("spotify.client.secret"))
         buildConfigField("String", "SPOTIFY_REFRESH_TOKEN", getQuotedProperty("spotify.refresh.token"))
     }
-
 
     buildTypes {
         release {
@@ -47,24 +53,27 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
-        // Enable buildConfig generation
         buildConfig = true
     }
+
     packaging {
         jniLibs {
-            // Fix for 16 KB page size devices compatibility (Android 15+)
             useLegacyPackaging = true
         }
     }
+
     androidResources {
         noCompress += "tflite"
     }
@@ -79,21 +88,19 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    // Networking
+
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // TensorFlow Lite (using version catalog)
-    implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.support)
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
-    // For Audio processing and HTTP download
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
     testImplementation(libs.junit)
-    testImplementation(libs.mockito.core)
-    testImplementation(libs.mockito.kotlin)
+    testImplementation("org.mockito:mockito-core:5.12.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -102,4 +109,12 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testDebugUnitTest") {
+        val kotlinUnitTestClasses = files(layout.buildDirectory.dir("tmp/kotlin-classes/debugUnitTest"))
+        testClassesDirs = files(testClassesDirs, kotlinUnitTestClasses)
+        classpath = classpath.plus(kotlinUnitTestClasses)
+    }
 }

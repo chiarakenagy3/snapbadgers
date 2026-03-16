@@ -1,5 +1,6 @@
 package com.example.snapbadgers.ui
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.UiState
+import com.example.snapbadgers.ui.components.CameraInputCard
 import com.example.snapbadgers.ui.components.EmptyResultHint
 import com.example.snapbadgers.ui.components.ErrorCard
 import com.example.snapbadgers.ui.components.Header
@@ -42,17 +46,21 @@ fun SnapBadgersDemoScreen() {
     val pipeline = remember(context) { RecommendationPipeline(context) }
 
     var input by remember { mutableStateOf("") }
+    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var state by remember { mutableStateOf<UiState>(UiState.Idle) }
     var steps by remember { mutableStateOf(InferenceSteps()) }
 
     val scope = rememberCoroutineScope()
-
+    val encoderLabel = pipeline.textEncoderLabel
+    val isModelBackedEncoder = pipeline.isModelBackedTextEncoder
     val isLoading = state is UiState.Loading
-    val canSubmit = input.isNotBlank() && !isLoading
+    val hasVisionInput = capturedBitmap != null
+    val canSubmit = (input.isNotBlank() || hasVisionInput) && !isLoading
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -78,7 +86,7 @@ fun SnapBadgersDemoScreen() {
                         input = it
                         if (state is UiState.Error) state = UiState.Idle
                     },
-                    label = { Text("e.g., calm rainy night, focused studying…") },
+                    label = { Text("e.g., calm rainy night, focused studying") },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading,
                     singleLine = false,
@@ -93,8 +101,8 @@ fun SnapBadgersDemoScreen() {
                     Button(
                         onClick = {
                             scope.launch {
-                                if (input.isBlank()) {
-                                    state = UiState.Error("Please enter a vibe description.")
+                                if (input.isBlank() && capturedBitmap == null) {
+                                    state = UiState.Error("Please enter a vibe description or capture a photo.")
                                     return@launch
                                 }
 
@@ -102,13 +110,14 @@ fun SnapBadgersDemoScreen() {
                                 state = UiState.Loading
 
                                 try {
-                                    val song = pipeline.runPipeline(
+                                    val result = pipeline.runPipeline(
                                         input = input,
+                                        imageBitmap = capturedBitmap,
                                         onStepUpdate = { updatedSteps ->
                                             steps = updatedSteps
                                         }
                                     )
-                                    state = UiState.Success(song)
+                                    state = UiState.Success(result)
                                 } catch (e: Exception) {
                                     state = UiState.Error(e.message ?: "Unknown error")
                                 }
@@ -123,6 +132,7 @@ fun SnapBadgersDemoScreen() {
                     OutlinedButton(
                         onClick = {
                             input = ""
+                            capturedBitmap = null
                             steps = InferenceSteps()
                             state = UiState.Idle
                         },
@@ -144,12 +154,34 @@ fun SnapBadgersDemoScreen() {
             }
         }
 
-        InferenceStatusCard(steps = steps, isLoading = isLoading)
+        CameraInputCard(
+            capturedBitmap = capturedBitmap,
+            enabled = !isLoading,
+            onBitmapCaptured = { bitmap ->
+                capturedBitmap = bitmap
+                if (state is UiState.Error) state = UiState.Idle
+            }
+        )
+
+        InferenceStatusCard(
+            steps = steps,
+            isLoading = isLoading,
+            encoderLabel = encoderLabel,
+            isModelBackedEncoder = isModelBackedEncoder,
+            hasVisionInput = hasVisionInput
+        )
 
         when (val s = state) {
             is UiState.Idle -> EmptyResultHint()
-            is UiState.Loading -> LoadingResultHint()
-            is UiState.Success -> RecommendationCard(song = s.song)
+            is UiState.Loading -> LoadingResultHint(
+                encoderLabel = encoderLabel,
+                hasVisionInput = hasVisionInput
+            )
+            is UiState.Success -> RecommendationCard(
+                result = s.result,
+                encoderLabel = encoderLabel,
+                isModelBackedEncoder = isModelBackedEncoder
+            )
             is UiState.Error -> ErrorCard(message = s.message)
         }
     }
