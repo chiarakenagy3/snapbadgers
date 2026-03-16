@@ -5,31 +5,51 @@ import android.graphics.Bitmap
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
+import com.example.snapbadgers.ai.text.TextEncoderDescriptor
 import com.example.snapbadgers.ai.text.TextEncoder
 import com.example.snapbadgers.ai.text.TextEncoderFactory
 import com.example.snapbadgers.ai.text.TextEncoderMode
+import com.example.snapbadgers.ai.text.StubTextEncoder
 import com.example.snapbadgers.ai.vision.VisionEncoder
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.RecommendationResult
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class RecommendationPipeline(
     context: Context,
-    private val textEncoder: TextEncoder = TextEncoderFactory.create(context),
     private val songRepository: SongRepository = SongRepository(context)
 ) {
+    private val appContext = context.applicationContext
+    private val useHeuristicTextEncoder = !songRepository.hasEmbeddedCatalog
 
-    private val sensorCollector = SensorCollector(context)
+    private var textEncoder: TextEncoder? = null
+    private val textEncoderInitMutex = Mutex()
+    private val textEncoderDescriptor: TextEncoderDescriptor = if (useHeuristicTextEncoder) {
+        TextEncoderDescriptor(
+            mode = TextEncoderMode.STUB,
+            label = "Stub heuristic encoder (catalog-aligned)"
+        )
+    } else {
+        TextEncoderFactory.describe(appContext)
+    }
+
+    private val sensorCollector = SensorCollector(appContext)
     private val sensorEncoder = SensorEncoder()
-    private val visionEncoder = VisionEncoder()
+    private val visionEncoder = VisionEncoder(appContext)
     private val fusionEngine = FusionEngine()
 
     val textEncoderLabel: String
-        get() = textEncoder.label
+        get() = textEncoder?.label ?: textEncoderDescriptor.label
 
     val isModelBackedTextEncoder: Boolean
-        get() = textEncoder.mode == TextEncoderMode.MODEL
+        get() = (textEncoder?.mode ?: textEncoderDescriptor.mode) == TextEncoderMode.MODEL
+
+    suspend fun warmUp() {
+        getOrCreateTextEncoder()
+    }
 
     suspend fun runPipeline(
         input: String,
@@ -43,7 +63,8 @@ class RecommendationPipeline(
             sensorCollector.start()
 
             delay(120)
-            val textEmbedding = textEncoder.encode(input)
+            val activeTextEncoder = getOrCreateTextEncoder()
+            val textEmbedding = activeTextEncoder.encode(input)
             steps = steps.copy(textEncoded = true)
             onStepUpdate(steps)
 
@@ -100,5 +121,21 @@ class RecommendationPipeline(
 
     private companion object {
         const val RECOMMENDATION_LIMIT = 3
+    }
+
+    private suspend fun getOrCreateTextEncoder(): TextEncoder {
+        textEncoder?.let { return it }
+
+        return textEncoderInitMutex.withLock {
+            textEncoder ?: if (useHeuristicTextEncoder) {
+                StubTextEncoder("Stub heuristic encoder (catalog-aligned)").also { initializedEncoder ->
+                    textEncoder = initializedEncoder
+                }
+            } else {
+                TextEncoderFactory.createAsync(appContext).also { initializedEncoder ->
+                    textEncoder = initializedEncoder
+                }
+            }
+        }
     }
 }

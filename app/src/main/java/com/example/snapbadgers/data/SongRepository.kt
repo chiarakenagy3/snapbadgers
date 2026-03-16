@@ -3,9 +3,11 @@ package com.example.snapbadgers.data
 import android.content.Context
 import android.util.Log
 import com.example.snapbadgers.ai.common.ml.VectorUtils
+import com.example.snapbadgers.ai.text.HeuristicTextEmbedding
 import com.example.snapbadgers.model.EmbeddedTrack
 import com.example.snapbadgers.model.Song
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import java.io.File
 
 class SongRepository(context: Context) {
@@ -13,34 +15,35 @@ class SongRepository(context: Context) {
     private val appContext = context.applicationContext
     private val gson = Gson()
     private val embeddedSongs: List<Song> by lazy { loadEmbeddedSongs() }
+    private val sampleSongs: List<Song> by lazy { loadSampleSongs() }
     private val fallbackSongs = listOf(
         Song(
             title = "Blinding Lights",
             artist = "The Weeknd",
             embedding = buildFallbackEmbedding(
-                raw = floatArrayOf(18f, 3f, 0f, 0f, 9.8f, 20f),
-                salt = "Blinding Lights".hashCode()
+                description = "Blinding Lights by The Weeknd energetic pop workout night drive upbeat"
             )
         ),
         Song(
             title = "Sunflower",
             artist = "Post Malone",
             embedding = buildFallbackEmbedding(
-                raw = floatArrayOf(12f, 2f, 0f, 0f, 8.5f, 50f),
-                salt = "Sunflower".hashCode()
+                description = "Sunflower by Post Malone happy chill pop easy listening daytime"
             )
         ),
         Song(
             title = "Weightless",
             artist = "Marconi Union",
             embedding = buildFallbackEmbedding(
-                raw = floatArrayOf(10f, 2f, 1f, 0f, 9.7f, 5f),
-                salt = "Weightless".hashCode()
+                description = "Weightless by Marconi Union calm study relax sleep ambient"
             )
         )
     )
 
-    fun getAllSongs(): List<Song> = embeddedSongs.ifEmpty { fallbackSongs }
+    fun getAllSongs(): List<Song> = candidateSongs()
+
+    val hasEmbeddedCatalog: Boolean
+        get() = embeddedSongs.isNotEmpty()
 
     fun findTopSongs(queryEmbedding: FloatArray, limit: Int = DEFAULT_RECOMMENDATION_LIMIT): List<Song> {
         val normalizedQuery = VectorUtils.alignToEmbeddingDimension(queryEmbedding, salt = QUERY_SALT)
@@ -58,7 +61,9 @@ class SongRepository(context: Context) {
     }
 
     private fun candidateSongs(): List<Song> {
-        return embeddedSongs.ifEmpty { fallbackSongs }
+        return embeddedSongs
+            .ifEmpty { sampleSongs }
+            .ifEmpty { fallbackSongs }
     }
 
     private fun loadEmbeddedSongs(): List<Song> {
@@ -78,6 +83,24 @@ class SongRepository(context: Context) {
                     )
                 )
             }
+    }
+
+    private fun loadSampleSongs(): List<Song> {
+        val catalog = runCatching {
+            appContext.assets.open(SAMPLE_SONGS_FILE).bufferedReader().use { reader ->
+                gson.fromJson(reader.readText(), SampleSongCatalog::class.java)
+            }
+        }.onFailure {
+            Log.w(TAG, "Failed to read asset $SAMPLE_SONGS_FILE", it)
+        }.getOrNull() ?: return emptyList()
+
+        return catalog.songs.map { sample ->
+            Song(
+                title = sample.title,
+                artist = sample.artist,
+                embedding = buildFallbackEmbedding(buildSampleSongDescription(sample))
+            )
+        }
     }
 
     private fun loadEmbeddedTracksFromFile(): List<EmbeddedTrack>? {
@@ -107,14 +130,70 @@ class SongRepository(context: Context) {
         return VectorUtils.cosineSimilarity(a, b)
     }
 
-    private fun buildFallbackEmbedding(raw: FloatArray, salt: Int): FloatArray {
-        return VectorUtils.alignToEmbeddingDimension(raw, salt = salt)
+    private fun buildFallbackEmbedding(description: String): FloatArray {
+        return HeuristicTextEmbedding.encode(description)
+    }
+
+    private fun buildSampleSongDescription(sample: SampleSongAsset): String {
+        return buildString {
+            append(sample.title)
+            append(' ')
+            append(sample.artist)
+
+            if (sample.genre.isNotEmpty()) {
+                append(' ')
+                append(sample.genre.joinToString(" "))
+            }
+
+            if (sample.mood.isNotEmpty()) {
+                append(' ')
+                append(sample.mood.joinToString(" "))
+            }
+
+            if (sample.contextTags.isNotEmpty()) {
+                append(' ')
+                append(sample.contextTags.joinToString(" "))
+            }
+
+            append(" tempo ")
+            append(sample.tempoBpm)
+            append(" energy ")
+            append((sample.energy * 100).toInt())
+            append(" valence ")
+            append((sample.valence * 100).toInt())
+            append(" danceability ")
+            append((sample.danceability * 100).toInt())
+            append(' ')
+            append(sample.metadataText)
+        }
     }
 
     private companion object {
         const val TAG = "SongRepository"
         const val TRACKS_FEATURES_FILE = "tracks_features.json"
+        const val SAMPLE_SONGS_FILE = "sample_songs.json"
         const val QUERY_SALT = 101
         const val DEFAULT_RECOMMENDATION_LIMIT = 3
     }
+
+    private data class SampleSongCatalog(
+        val songs: List<SampleSongAsset> = emptyList()
+    )
+
+    private data class SampleSongAsset(
+        val id: String,
+        val title: String,
+        val artist: String,
+        val genre: List<String> = emptyList(),
+        val mood: List<String> = emptyList(),
+        @SerializedName("tempo_bpm")
+        val tempoBpm: Int = 0,
+        val energy: Float = 0f,
+        val valence: Float = 0f,
+        val danceability: Float = 0f,
+        @SerializedName("context_tags")
+        val contextTags: List<String> = emptyList(),
+        @SerializedName("metadata_text")
+        val metadataText: String = ""
+    )
 }
