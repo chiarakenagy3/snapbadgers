@@ -62,6 +62,7 @@ fun InferenceStatusCard(
             )
 
             StepRow("Text encoding", status = if (steps.textEncoded) "Done" else "Pending")
+            StepRow("Sensor encoding", status = if (steps.sensorEncoded) "Done" else "Pending")
             StepRow(
                 "Vision encoding",
                 status = when {

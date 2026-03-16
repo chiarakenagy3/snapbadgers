@@ -58,6 +58,8 @@ class RecommendationPipeline(
             delay(120)
             val sensorSample = sensorCollector.getLatestSample()
             val sensorEmbedding = sensorEncoder.encode(sensorSample)
+            steps = steps.copy(sensorEncoded = true)
+            onStepUpdate(steps)
 
             delay(120)
             val fusedEmbedding = fusionEngine.fuse(
