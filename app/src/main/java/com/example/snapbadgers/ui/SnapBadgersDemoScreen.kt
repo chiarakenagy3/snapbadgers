@@ -1,21 +1,37 @@
 package com.example.snapbadgers.ui
 
 import android.graphics.Bitmap
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,168 +42,317 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.UiState
 import com.example.snapbadgers.ui.components.CameraInputCard
-import com.example.snapbadgers.ui.components.EmptyResultHint
-import com.example.snapbadgers.ui.components.ErrorCard
-import com.example.snapbadgers.ui.components.Header
 import com.example.snapbadgers.ui.components.InferenceStatusCard
-import com.example.snapbadgers.ui.components.LoadingResultHint
 import com.example.snapbadgers.ui.components.RecommendationCard
+import com.example.snapbadgers.ui.theme.Zinc500
+import com.example.snapbadgers.ui.theme.Zinc800
+import com.example.snapbadgers.ui.theme.Zinc900
+import com.example.snapbadgers.ui.theme.Zinc950
 import kotlinx.coroutines.launch
 
 @Composable
 fun SnapBadgersDemoScreen() {
     val context = LocalContext.current
     val pipeline = remember(context) { RecommendationPipeline(context) }
+    val scope = rememberCoroutineScope()
+
+    var activeTab by remember { mutableStateOf("analyze") }
+    var state by remember { mutableStateOf<UiState>(UiState.Idle) }
+    var steps by remember { mutableStateOf(InferenceSteps()) }
+    var input by remember { mutableStateOf("") }
+    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(pipeline) {
         pipeline.warmUp()
     }
 
-    var input by remember { mutableStateOf("") }
-    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var state by remember { mutableStateOf<UiState>(UiState.Idle) }
-    var steps by remember { mutableStateOf(InferenceSteps()) }
+    val hasResult = state is UiState.Success
+    val renderTab = if (hasResult && (activeTab == "analyze" || activeTab == "player")) "player" else activeTab
 
-    val scope = rememberCoroutineScope()
-    val encoderLabel = pipeline.textEncoderLabel
-    val isModelBackedEncoder = pipeline.isModelBackedTextEncoder
-    val isLoading = state is UiState.Loading
-    val hasVisionInput = capturedBitmap != null
-    val canSubmit = (input.isNotBlank() || hasVisionInput) && !isLoading
-
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .background(Color.Black)
     ) {
-        Header()
+        Sidebar(
+            activeTab = if (activeTab == "player") "analyze" else activeTab,
+            onTabSelected = { tab ->
+                activeTab = tab
+                if (tab != "analyze" && tab != "player") {
+                    state = UiState.Idle
+                }
+            }
+        )
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .background(Zinc950)
         ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Describe your vibe",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = {
-                        input = it
-                        if (state is UiState.Error) state = UiState.Idle
-                    },
-                    label = { Text("e.g., calm rainy night, focused studying") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading,
-                    singleLine = false,
-                    minLines = 2
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
+            Crossfade(targetState = renderTab, label = "content") { tab ->
+                when (tab) {
+                    "analyze" -> SceneAnalyzer(
+                        input = input,
+                        onInputChange = { input = it },
+                        capturedBitmap = capturedBitmap,
+                        onBitmapCaptured = { capturedBitmap = it },
+                        isLoading = state is UiState.Loading,
+                        steps = steps,
+                        pipeline = pipeline,
+                        onAnalyze = {
                             scope.launch {
                                 if (input.isBlank() && capturedBitmap == null) {
-                                    state = UiState.Error("Please enter a vibe description or capture a photo.")
+                                    state = UiState.Error("Please provide input")
                                     return@launch
                                 }
-
                                 steps = InferenceSteps()
                                 state = UiState.Loading
-
                                 try {
                                     val result = pipeline.runPipeline(
                                         input = input,
                                         imageBitmap = capturedBitmap,
-                                        onStepUpdate = { updatedSteps ->
-                                            steps = updatedSteps
-                                        }
+                                        onStepUpdate = { steps = it }
                                     )
                                     state = UiState.Success(result)
+                                    activeTab = "player"
                                 } catch (e: Exception) {
-                                    state = UiState.Error(e.message ?: "Unknown error")
+                                    state = UiState.Error(e.message ?: "Error")
                                 }
                             }
-                        },
-                        enabled = canSubmit,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (isLoading) "Running..." else "Recommend")
+                        }
+                    )
+
+                    "player" -> {
+                        val successState = state as? UiState.Success
+                        if (successState != null) {
+                            RecommendationCard(
+                                result = successState.result,
+                                encoderLabel = pipeline.textEncoderLabel,
+                                isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
+                                onReset = {
+                                    state = UiState.Idle
+                                    activeTab = "analyze"
+                                }
+                            )
+                        } else {
+                            activeTab = "analyze"
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            input = ""
-                            capturedBitmap = null
-                            steps = InferenceSteps()
-                            state = UiState.Idle
-                        },
-                        enabled = !isLoading,
-                        modifier = Modifier.wrapContentWidth()
-                    ) {
-                        Text("Reset")
-                    }
+                    "library" -> PlaceholderContent("Library Empty", "Start an analysis to generate playlists.")
+                    "activity" -> PlaceholderContent("No History", "Your recent listening sessions will appear here.")
+                    "settings" -> PlaceholderContent("Settings", "Configure API keys for Spotify and Qualcomm AI Hub.")
+                    else -> SceneAnalyzer(
+                        input = input,
+                        onInputChange = { input = it },
+                        capturedBitmap = capturedBitmap,
+                        onBitmapCaptured = { capturedBitmap = it },
+                        isLoading = state is UiState.Loading,
+                        steps = steps,
+                        pipeline = pipeline,
+                        onAnalyze = {
+                            scope.launch {
+                                if (input.isBlank() && capturedBitmap == null) {
+                                    state = UiState.Error("Please provide input")
+                                    return@launch
+                                }
+                                steps = InferenceSteps()
+                                state = UiState.Loading
+                                try {
+                                    val result = pipeline.runPipeline(
+                                        input = input,
+                                        imageBitmap = capturedBitmap,
+                                        onStepUpdate = { steps = it }
+                                    )
+                                    state = UiState.Success(result)
+                                    activeTab = "player"
+                                } catch (e: Exception) {
+                                    state = UiState.Error(e.message ?: "Error")
+                                }
+                            }
+                        }
+                    )
                 }
+            }
+        }
+    }
+}
 
+@Composable
+private fun Sidebar(activeTab: String, onTabSelected: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(80.dp)
+            .fillMaxHeight()
+            .background(Color.Black)
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Icon(
+            Icons.Default.AutoAwesome,
+            contentDescription = null,
+            modifier = Modifier.size(32.dp),
+            tint = Color.White
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SidebarItem(Icons.Default.Search, "analyze", activeTab == "analyze", onTabSelected)
+        SidebarItem(Icons.Default.LibraryMusic, "library", activeTab == "library", onTabSelected)
+        SidebarItem(Icons.Default.History, "activity", activeTab == "activity", onTabSelected)
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        SidebarItem(Icons.Default.Settings, "settings", activeTab == "settings", onTabSelected)
+    }
+}
+
+@Composable
+private fun SidebarItem(icon: ImageVector, id: String, isSelected: Boolean, onClick: (String) -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .background(
+                if (isSelected) Zinc800 else Color.Transparent,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable { onClick(id) },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon,
+            contentDescription = id,
+            tint = if (isSelected) Color.White else Zinc500,
+            modifier = Modifier.size(24.dp)
+        )
+    }
+}
+
+@Composable
+private fun SceneAnalyzer(
+    input: String,
+    onInputChange: (String) -> Unit,
+    capturedBitmap: Bitmap?,
+    onBitmapCaptured: (Bitmap?) -> Unit,
+    isLoading: Boolean,
+    steps: InferenceSteps,
+    pipeline: RecommendationPipeline,
+    onAnalyze: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Text(
+            text = "Scene Analyzer",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Zinc900),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text(
-                    text = if (isLoading) {
-                        "Processing locally on the device..."
-                    } else {
-                        "Tip: short phrases work best for demos."
-                    },
-                    style = MaterialTheme.typography.bodySmall
+                    text = "Describe your vibe",
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp
                 )
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = onInputChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. A rainy afternoon in a cozy cafe", color = Zinc500) },
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Zinc800,
+                        focusedContainerColor = Color.Black,
+                        unfocusedContainerColor = Color.Black
+                    )
+                )
+
+                Button(
+                    onClick = onAnalyze,
+                    enabled = !isLoading && (input.isNotBlank() || capturedBitmap != null),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(if (isLoading) "Analyzing..." else "Analyze Scene", fontWeight = FontWeight.Bold)
+                }
             }
         }
 
         CameraInputCard(
             capturedBitmap = capturedBitmap,
             enabled = !isLoading,
-            onBitmapCaptured = { bitmap ->
-                capturedBitmap = bitmap
-                if (state is UiState.Error) state = UiState.Idle
-            }
+            onBitmapCaptured = onBitmapCaptured
         )
 
         InferenceStatusCard(
             steps = steps,
             isLoading = isLoading,
-            encoderLabel = encoderLabel,
-            isModelBackedEncoder = isModelBackedEncoder,
-            hasVisionInput = hasVisionInput
+            encoderLabel = pipeline.textEncoderLabel,
+            isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
+            hasVisionInput = capturedBitmap != null
         )
+    }
+}
 
-        when (val s = state) {
-            is UiState.Idle -> EmptyResultHint()
-            is UiState.Loading -> LoadingResultHint(
-                encoderLabel = encoderLabel,
-                hasVisionInput = hasVisionInput
+@Composable
+private fun PlaceholderContent(title: String, subtitle: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White,
+                textAlign = TextAlign.Center
             )
-            is UiState.Success -> RecommendationCard(
-                result = s.result,
-                encoderLabel = encoderLabel,
-                isModelBackedEncoder = isModelBackedEncoder
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = subtitle,
+                color = Zinc500,
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center
             )
-            is UiState.Error -> ErrorCard(message = s.message)
         }
     }
 }
