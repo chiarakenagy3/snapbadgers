@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,10 +51,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
+import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.UiState
 import com.example.snapbadgers.ui.components.CameraInputCard
+import com.example.snapbadgers.ui.components.HistoryScreen
 import com.example.snapbadgers.ui.components.InferenceStatusCard
+import com.example.snapbadgers.ui.components.LibraryScreen
 import com.example.snapbadgers.ui.components.RecommendationCard
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
@@ -72,6 +76,9 @@ fun SnapBadgersDemoScreen() {
     var steps by remember { mutableStateOf(InferenceSteps()) }
     var input by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    
+    val history = remember { mutableStateListOf<HistoryItem>() }
+    val allSongs = remember(pipeline) { pipeline.getAllSongs() }
 
     LaunchedEffect(pipeline) {
         pipeline.warmUp()
@@ -126,6 +133,7 @@ fun SnapBadgersDemoScreen() {
                                         onStepUpdate = { steps = it }
                                     )
                                     state = UiState.Success(result)
+                                    history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
                                     activeTab = "player"
                                 } catch (e: Exception) {
                                     state = UiState.Error(e.message ?: "Error")
@@ -151,8 +159,8 @@ fun SnapBadgersDemoScreen() {
                         }
                     }
 
-                    "library" -> PlaceholderContent("Library Empty", "Start an analysis to generate playlists.")
-                    "activity" -> PlaceholderContent("No History", "Your recent listening sessions will appear here.")
+                    "library" -> LibraryScreen(songs = allSongs)
+                    "activity" -> HistoryScreen(history = history)
                     "settings" -> PlaceholderContent("Settings", "Configure API keys for Spotify and Qualcomm AI Hub.")
                     else -> SceneAnalyzer(
                         input = input,
@@ -177,6 +185,7 @@ fun SnapBadgersDemoScreen() {
                                         onStepUpdate = { steps = it }
                                     )
                                     state = UiState.Success(result)
+                                    history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
                                     activeTab = "player"
                                 } catch (e: Exception) {
                                     state = UiState.Error(e.message ?: "Error")
