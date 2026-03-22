@@ -68,12 +68,6 @@ android {
         buildConfig = true
     }
 
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
-
     androidResources {
         noCompress += "tflite"
     }
@@ -94,8 +88,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation(libs.litert)
 
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
