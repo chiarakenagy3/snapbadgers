@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
+import com.example.snapbadgers.data.SettingsRepository
 import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.UiState
@@ -59,6 +60,7 @@ import com.example.snapbadgers.ui.components.HistoryScreen
 import com.example.snapbadgers.ui.components.InferenceStatusCard
 import com.example.snapbadgers.ui.components.LibraryScreen
 import com.example.snapbadgers.ui.components.RecommendationCard
+import com.example.snapbadgers.ui.components.SettingsScreen
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
 import com.example.snapbadgers.ui.theme.Zinc900
@@ -69,6 +71,7 @@ import kotlinx.coroutines.launch
 fun SnapBadgersDemoScreen() {
     val context = LocalContext.current
     val pipeline = remember(context) { RecommendationPipeline(context) }
+    val settingsRepository = remember(context) { SettingsRepository(context) }
     val scope = rememberCoroutineScope()
 
     var activeTab by remember { mutableStateOf("analyze") }
@@ -161,7 +164,7 @@ fun SnapBadgersDemoScreen() {
 
                     "library" -> LibraryScreen(songs = allSongs)
                     "activity" -> HistoryScreen(history = history)
-                    "settings" -> PlaceholderContent("Settings", "Configure API keys for Spotify and Qualcomm AI Hub.")
+                    "settings" -> SettingsScreen(settingsRepository = settingsRepository)
                     else -> SceneAnalyzer(
                         input = input,
                         onInputChange = { input = it },
