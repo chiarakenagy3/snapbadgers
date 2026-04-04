@@ -68,10 +68,9 @@ import com.example.snapbadgers.ui.theme.Zinc950
 import kotlinx.coroutines.launch
 
 @Composable
-fun SnapBadgersDemoScreen() {
+fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
     val context = LocalContext.current
     val pipeline = remember(context) { RecommendationPipeline(context) }
-    val settingsRepository = remember(context) { SettingsRepository(context) }
     val scope = rememberCoroutineScope()
 
     var activeTab by remember { mutableStateOf("analyze") }

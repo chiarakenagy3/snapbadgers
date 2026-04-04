@@ -1,6 +1,6 @@
 package com.example.snapbadgers.ui.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,17 +25,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.data.SettingsRepository
+import androidx.compose.foundation.layout.ColumnScope
 import com.example.snapbadgers.ui.theme.Zinc400
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
 import com.example.snapbadgers.ui.theme.Zinc900
-import androidx.compose.foundation.layout.ColumnScope
 
 @Composable
 fun SettingsScreen(settingsRepository: SettingsRepository) {
     val spotifyKey = settingsRepository.spotifyKey.value
-    val aiHubKey = settingsRepository.aiHubKey.value
-    val useHighPrecision = settingsRepository.useHighPrecision.value
+    val displayName = settingsRepository.displayName.value
+    val email = settingsRepository.email.value
+    val themeMode = settingsRepository.themeMode.value
+    val language = settingsRepository.language.value
+    val notificationsEnabled = settingsRepository.notificationsEnabled.value
+    val personalizationEnabled = settingsRepository.personalizationEnabled.value
 
     Column(
         modifier = Modifier
@@ -51,27 +55,62 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
             color = Color.White
         )
 
-        SettingsSection(title = "API Configuration") {
+        SettingsSection(title = "Spotify API") {
             SettingsInputField(
-                label = "Spotify API Client ID",
+                label = "Spotify Client ID",
                 value = spotifyKey,
                 onValueChange = { settingsRepository.updateSpotifyKey(it) },
                 placeholder = "Enter your Spotify Client ID"
             )
+        }
+
+        SettingsSection(title = "Account") {
             SettingsInputField(
-                label = "Qualcomm AI Hub Key",
-                value = aiHubKey,
-                onValueChange = { settingsRepository.updateAiHubKey(it) },
-                placeholder = "Enter AI Hub API Token"
+                label = "Display Name",
+                value = displayName,
+                onValueChange = { settingsRepository.updateDisplayName(it) },
+                placeholder = "Enter your name"
+            )
+            SettingsInputField(
+                label = "Email",
+                value = email,
+                onValueChange = { settingsRepository.updateEmail(it) },
+                placeholder = "Enter your email"
             )
         }
 
-        SettingsSection(title = "Inference Engine") {
+        SettingsSection(title = "Appearance") {
+            SettingsOptionSelector(
+                label = "Theme",
+                description = "Choose app brightness and color preference",
+                options = listOf("System", "Dark", "Light"),
+                selectedOption = themeMode,
+                onOptionSelected = { settingsRepository.updateThemeMode(it) }
+            )
+        }
+
+        SettingsSection(title = "Language") {
+            SettingsOptionSelector(
+                label = "App Language",
+                description = "Set your preferred display language",
+                options = listOf("English", "Chinese", "Spanish"),
+                selectedOption = language,
+                onOptionSelected = { settingsRepository.updateLanguage(it) }
+            )
+        }
+
+        SettingsSection(title = "Preferences") {
             SettingsToggle(
-                label = "High Precision Mode",
-                description = "Use FP32 instead of INT8 for text encoders",
-                checked = useHighPrecision,
-                onCheckedChange = { settingsRepository.updateUseHighPrecision(it) }
+                label = "Push Notifications",
+                description = "Receive alerts for fresh recommendations",
+                checked = notificationsEnabled,
+                onCheckedChange = { settingsRepository.updateNotificationsEnabled(it) }
+            )
+            SettingsToggle(
+                label = "Personalized Recommendations",
+                description = "Use your history and profile to improve suggestions",
+                checked = personalizationEnabled,
+                onCheckedChange = { settingsRepository.updatePersonalizationEnabled(it) }
             )
         }
 
@@ -82,7 +121,7 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
                 fontSize = 14.sp
             )
             Text(
-                text = "Powered by Qualcomm AI Hub & Snapdragon 8 Gen 3",
+                text = "Multimodal music recommendation demo",
                 color = Zinc500,
                 fontSize = 12.sp
             )
@@ -141,6 +180,45 @@ private fun SettingsInputField(
                 unfocusedContainerColor = Color.Black
             )
         )
+    }
+}
+
+@Composable
+private fun SettingsOptionSelector(
+    label: String,
+    description: String,
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(text = label, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text(text = description, color = Zinc500, fontSize = 12.sp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { option ->
+                val isSelected = option == selectedOption
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) Color.White else Color.Black
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOptionSelected(option) }
+                ) {
+                    Text(
+                        text = option,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        color = if (isSelected) Color.Black else Zinc400,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
 

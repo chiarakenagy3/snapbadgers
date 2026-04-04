@@ -67,8 +67,8 @@ class SnapBadgersUiTest {
         // Verify Settings screen title
         composeTestRule.onNodeWithText("Settings").assertIsDisplayed()
         
-        // Check if API key fields are visible
-        composeTestRule.onNodeWithText("API Configuration").assertIsDisplayed()
+        // Check if common settings sections are visible
+        composeTestRule.onNodeWithText("Account").assertIsDisplayed()
     }
 
     /**
