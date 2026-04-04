@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
@@ -26,10 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.data.SettingsRepository
 import androidx.compose.foundation.layout.ColumnScope
+import com.example.snapbadgers.ui.i18n.AppI18n
 import com.example.snapbadgers.ui.theme.Zinc400
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
-import com.example.snapbadgers.ui.theme.Zinc900
 
 @Composable
 fun SettingsScreen(settingsRepository: SettingsRepository) {
@@ -40,6 +41,7 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
     val language = settingsRepository.language.value
     val notificationsEnabled = settingsRepository.notificationsEnabled.value
     val personalizationEnabled = settingsRepository.personalizationEnabled.value
+    val strings = AppI18n.forLanguage(language)
 
     Column(
         modifier = Modifier
@@ -49,39 +51,39 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text(
-            text = "Settings",
+            text = strings.settings,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
 
-        SettingsSection(title = "Spotify API") {
+        SettingsSection(title = strings.spotifyApi) {
             SettingsInputField(
-                label = "Spotify Client ID",
+                label = strings.spotifyClientId,
                 value = spotifyKey,
                 onValueChange = { settingsRepository.updateSpotifyKey(it) },
                 placeholder = "Enter your Spotify Client ID"
             )
         }
 
-        SettingsSection(title = "Account") {
+        SettingsSection(title = strings.account) {
             SettingsInputField(
-                label = "Display Name",
+                label = strings.displayName,
                 value = displayName,
                 onValueChange = { settingsRepository.updateDisplayName(it) },
                 placeholder = "Enter your name"
             )
             SettingsInputField(
-                label = "Email",
+                label = strings.email,
                 value = email,
                 onValueChange = { settingsRepository.updateEmail(it) },
                 placeholder = "Enter your email"
             )
         }
 
-        SettingsSection(title = "Appearance") {
+        SettingsSection(title = strings.appearance) {
             SettingsOptionSelector(
-                label = "Theme",
+                label = strings.theme,
                 description = "Choose app brightness and color preference",
                 options = listOf("System", "Dark", "Light"),
                 selectedOption = themeMode,
@@ -89,9 +91,9 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
             )
         }
 
-        SettingsSection(title = "Language") {
+        SettingsSection(title = strings.language) {
             SettingsOptionSelector(
-                label = "App Language",
+                label = strings.language,
                 description = "Set your preferred display language",
                 options = listOf("English", "Chinese", "Spanish"),
                 selectedOption = language,
@@ -99,15 +101,15 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
             )
         }
 
-        SettingsSection(title = "Preferences") {
+        SettingsSection(title = strings.preferences) {
             SettingsToggle(
-                label = "Push Notifications",
+                label = strings.pushNotifications,
                 description = "Receive alerts for fresh recommendations",
                 checked = notificationsEnabled,
                 onCheckedChange = { settingsRepository.updateNotificationsEnabled(it) }
             )
             SettingsToggle(
-                label = "Personalized Recommendations",
+                label = strings.personalizedRecommendations,
                 description = "Use your history and profile to improve suggestions",
                 checked = personalizationEnabled,
                 onCheckedChange = { settingsRepository.updatePersonalizationEnabled(it) }
@@ -134,13 +136,13 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = title,
-            color = Zinc400,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 4.dp)
         )
         Card(
-            colors = CardDefaults.cardColors(containerColor = Zinc900),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -162,7 +164,7 @@ private fun SettingsInputField(
     placeholder: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = label, color = Color.White, fontSize = 14.sp)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -171,13 +173,13 @@ private fun SettingsInputField(
             shape = RoundedCornerShape(8.dp),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Zinc800,
-                focusedContainerColor = Color.Black,
-                unfocusedContainerColor = Color.Black
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                cursorColor = MaterialTheme.colorScheme.onSurface,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
             )
         )
     }
@@ -192,7 +194,7 @@ private fun SettingsOptionSelector(
     onOptionSelected: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(text = label, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         Text(text = description, color = Zinc500, fontSize = 12.sp)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -202,7 +204,7 @@ private fun SettingsOptionSelector(
                 val isSelected = option == selectedOption
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) Color.White else Color.Black
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                     ),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
@@ -212,7 +214,7 @@ private fun SettingsOptionSelector(
                     Text(
                         text = option,
                         modifier = Modifier.padding(vertical = 10.dp),
-                        color = if (isSelected) Color.Black else Zinc400,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                     )
@@ -235,17 +237,17 @@ private fun SettingsToggle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Text(text = description, color = Zinc500, fontSize = 12.sp)
+            Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(text = description, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Zinc800,
-                uncheckedThumbColor = Zinc500,
-                uncheckedTrackColor = Color.Black
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surface
             )
         )
     }

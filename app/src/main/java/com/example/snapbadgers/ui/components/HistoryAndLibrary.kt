@@ -25,22 +25,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.Song
+import com.example.snapbadgers.ui.i18n.AppI18n
 import com.example.snapbadgers.ui.theme.Zinc400
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
-import com.example.snapbadgers.ui.theme.Zinc900
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun LibraryScreen(songs: List<Song>) {
+fun LibraryScreen(songs: List<Song>, language: String) {
+    val strings = AppI18n.forLanguage(language)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,17 +48,17 @@ fun LibraryScreen(songs: List<Song>) {
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text(
-            text = "Music Library",
+            text = strings.musicLibrary,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         if (songs.isEmpty()) {
             EmptyState(
                 icon = Icons.Default.LibraryMusic,
-                title = "Library Empty",
-                subtitle = "No songs found in the catalog."
+                title = strings.libraryEmpty,
+                subtitle = strings.noSongsFound
             )
         } else {
             LazyColumn(
@@ -74,7 +74,8 @@ fun LibraryScreen(songs: List<Song>) {
 }
 
 @Composable
-fun HistoryScreen(history: List<HistoryItem>) {
+fun HistoryScreen(history: List<HistoryItem>, language: String) {
+    val strings = AppI18n.forLanguage(language)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -82,17 +83,17 @@ fun HistoryScreen(history: List<HistoryItem>) {
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text(
-            text = "Activity History",
+            text = strings.activityHistory,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         if (history.isEmpty()) {
             EmptyState(
                 icon = Icons.Default.History,
-                title = "No History",
-                subtitle = "Your recent listening sessions will appear here."
+                title = strings.noHistory,
+                subtitle = strings.historyEmptyHint
             )
         } else {
             LazyColumn(
@@ -110,7 +111,7 @@ fun HistoryScreen(history: List<HistoryItem>) {
 @Composable
 private fun SongItem(song: Song) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Zinc900),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -128,7 +129,7 @@ private fun SongItem(song: Song) {
             Column {
                 Text(
                     text = song.title,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp
                 )
@@ -148,7 +149,7 @@ private fun HistoryCard(item: HistoryItem) {
     val dateString = dateFormat.format(Date(item.timestamp))
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Zinc900),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -176,7 +177,7 @@ private fun HistoryCard(item: HistoryItem) {
 
             Text(
                 text = "\"${item.query}\"",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp
             )
@@ -191,14 +192,14 @@ private fun HistoryCard(item: HistoryItem) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "▶",
-                        color = Color.White,
+                        text = ">",
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp
                     )
                     Column {
                         Text(
                             text = song.title,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -232,7 +233,7 @@ private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
             text = title,
             fontSize = 20.sp,
             fontWeight = FontWeight.Medium,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = subtitle,
