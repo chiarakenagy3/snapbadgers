@@ -3,6 +3,7 @@ package com.example.snapbadgers.ai.pipeline
 import android.content.Context
 import android.graphics.Bitmap
 import com.example.snapbadgers.ai.fusion.FusionEngine
+import com.example.snapbadgers.ai.projection.ProjectionNetwork
 import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
 import com.example.snapbadgers.ai.text.TextEncoderDescriptor
@@ -36,10 +37,11 @@ class RecommendationPipeline(
         TextEncoderFactory.describe(appContext)
     }
 
-    private val sensorCollector = SensorCollector(appContext)
-    private val sensorEncoder = SensorEncoder()
-    private val visionEncoder = VisionEncoder(appContext)
-    private val fusionEngine = FusionEngine()
+    private val sensorCollector   = SensorCollector(appContext)
+    private val sensorEncoder     = SensorEncoder()
+    private val visionEncoder     = VisionEncoder(appContext)  
+    private val fusionEngine      = FusionEngine()
+    private val projectionNetwork = ProjectionNetwork()        
 
     val textEncoderLabel: String
         get() = textEncoder?.label ?: textEncoderDescriptor.label
@@ -62,12 +64,14 @@ class RecommendationPipeline(
         try {
             sensorCollector.start()
 
+            // Step 1: Text encoding
             delay(120)
             val activeTextEncoder = getOrCreateTextEncoder()
             val textEmbedding = activeTextEncoder.encode(input)
             steps = steps.copy(textEncoded = true)
             onStepUpdate(steps)
 
+            // Step 2: Vision encoding (only if bitmap provided)
             delay(120)
             val visionEmbedding = imageBitmap?.let { bitmap ->
                 val embedding = visionEncoder.encode(bitmap)
@@ -76,27 +80,30 @@ class RecommendationPipeline(
                 embedding
             }
 
+            // Step 3: Sensor encoding
             delay(120)
             val sensorSample = sensorCollector.getLatestSample()
             val sensorEmbedding = sensorEncoder.encode(sensorSample)
             steps = steps.copy(sensorEncoded = true)
             onStepUpdate(steps)
 
+            // Step 4: Fusion → 128-d fused context embedding
             delay(120)
             val fusedEmbedding = fusionEngine.fuse(
-                textEmbedding = textEmbedding,
+                textEmbedding   = textEmbedding,
                 visionEmbedding = visionEmbedding,
                 sensorEmbedding = sensorEmbedding
             )
             steps = steps.copy(fused = true)
             onStepUpdate(steps)
 
-            val projectedEmbedding = fusedEmbedding
-
+            // Step 5: Projection → map fused embedding into song embedding space
             delay(120)
+            val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
             steps = steps.copy(projected = true)
             onStepUpdate(steps)
 
+            // Step 6: Song ranking via cosine similarity
             delay(160)
             val rankedSongs = songRepository.findTopSongs(
                 queryEmbedding = projectedEmbedding,
