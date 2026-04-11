@@ -30,12 +30,14 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,28 +52,38 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
+import com.example.snapbadgers.data.SettingsRepository
+import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.UiState
 import com.example.snapbadgers.ui.components.CameraInputCard
+import com.example.snapbadgers.ui.components.HistoryScreen
 import com.example.snapbadgers.ui.components.InferenceStatusCard
+import com.example.snapbadgers.ui.components.LibraryScreen
 import com.example.snapbadgers.ui.components.RecommendationCard
+import com.example.snapbadgers.ui.components.SettingsScreen
+import com.example.snapbadgers.ui.i18n.AppI18n
+import com.example.snapbadgers.ui.i18n.AppStrings
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
-import com.example.snapbadgers.ui.theme.Zinc900
-import com.example.snapbadgers.ui.theme.Zinc950
 import kotlinx.coroutines.launch
 
 @Composable
-fun SnapBadgersDemoScreen() {
+fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
     val context = LocalContext.current
     val pipeline = remember(context) { RecommendationPipeline(context) }
     val scope = rememberCoroutineScope()
+    val language by settingsRepository.language
+    val strings = AppI18n.forLanguage(language)
 
     var activeTab by remember { mutableStateOf("analyze") }
     var state by remember { mutableStateOf<UiState>(UiState.Idle) }
     var steps by remember { mutableStateOf(InferenceSteps()) }
     var input by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    
+    val history = remember { mutableStateListOf<HistoryItem>() }
+    val allSongs = remember(pipeline) { pipeline.getAllSongs() }
 
     LaunchedEffect(pipeline) {
         pipeline.warmUp()
@@ -83,7 +95,7 @@ fun SnapBadgersDemoScreen() {
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Sidebar(
             activeTab = if (activeTab == "player") "analyze" else activeTab,
@@ -99,11 +111,12 @@ fun SnapBadgersDemoScreen() {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(Zinc950)
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             Crossfade(targetState = renderTab, label = "content") { tab ->
                 when (tab) {
                     "analyze" -> SceneAnalyzer(
+                        strings = strings,
                         input = input,
                         onInputChange = { input = it },
                         capturedBitmap = capturedBitmap,
@@ -114,7 +127,7 @@ fun SnapBadgersDemoScreen() {
                         onAnalyze = {
                             scope.launch {
                                 if (input.isBlank() && capturedBitmap == null) {
-                                    state = UiState.Error("Please provide input")
+                                    state = UiState.Error(strings.pleaseProvideInput)
                                     return@launch
                                 }
                                 steps = InferenceSteps()
@@ -126,6 +139,7 @@ fun SnapBadgersDemoScreen() {
                                         onStepUpdate = { steps = it }
                                     )
                                     state = UiState.Success(result)
+                                    history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
                                     activeTab = "player"
                                 } catch (e: Exception) {
                                     state = UiState.Error(e.message ?: "Error")
@@ -151,10 +165,11 @@ fun SnapBadgersDemoScreen() {
                         }
                     }
 
-                    "library" -> PlaceholderContent("Library Empty", "Start an analysis to generate playlists.")
-                    "activity" -> PlaceholderContent("No History", "Your recent listening sessions will appear here.")
-                    "settings" -> PlaceholderContent("Settings", "Configure API keys for Spotify and Qualcomm AI Hub.")
+                    "library" -> LibraryScreen(songs = allSongs, language = language)
+                    "activity" -> HistoryScreen(history = history, language = language)
+                    "settings" -> SettingsScreen(settingsRepository = settingsRepository)
                     else -> SceneAnalyzer(
+                        strings = strings,
                         input = input,
                         onInputChange = { input = it },
                         capturedBitmap = capturedBitmap,
@@ -165,7 +180,7 @@ fun SnapBadgersDemoScreen() {
                         onAnalyze = {
                             scope.launch {
                                 if (input.isBlank() && capturedBitmap == null) {
-                                    state = UiState.Error("Please provide input")
+                                    state = UiState.Error(strings.pleaseProvideInput)
                                     return@launch
                                 }
                                 steps = InferenceSteps()
@@ -177,6 +192,7 @@ fun SnapBadgersDemoScreen() {
                                         onStepUpdate = { steps = it }
                                     )
                                     state = UiState.Success(result)
+                                    history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
                                     activeTab = "player"
                                 } catch (e: Exception) {
                                     state = UiState.Error(e.message ?: "Error")
@@ -196,7 +212,7 @@ private fun Sidebar(activeTab: String, onTabSelected: (String) -> Unit) {
         modifier = Modifier
             .width(80.dp)
             .fillMaxHeight()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -205,7 +221,7 @@ private fun Sidebar(activeTab: String, onTabSelected: (String) -> Unit) {
             Icons.Default.AutoAwesome,
             contentDescription = null,
             modifier = Modifier.size(32.dp),
-            tint = Color.White
+            tint = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -235,7 +251,7 @@ private fun SidebarItem(icon: ImageVector, id: String, isSelected: Boolean, onCl
         Icon(
             icon,
             contentDescription = id,
-            tint = if (isSelected) Color.White else Zinc500,
+            tint = if (isSelected) MaterialTheme.colorScheme.onBackground else Zinc500,
             modifier = Modifier.size(24.dp)
         )
     }
@@ -243,6 +259,7 @@ private fun SidebarItem(icon: ImageVector, id: String, isSelected: Boolean, onCl
 
 @Composable
 private fun SceneAnalyzer(
+    strings: AppStrings,
     input: String,
     onInputChange: (String) -> Unit,
     capturedBitmap: Bitmap?,
@@ -260,14 +277,14 @@ private fun SceneAnalyzer(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text(
-            text = "Scene Analyzer",
+            text = strings.sceneAnalyzer,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = Zinc900),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -276,8 +293,8 @@ private fun SceneAnalyzer(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Describe your vibe",
-                    color = Color.White,
+                    text = strings.describeYourVibe,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                     fontSize = 16.sp
                 )
@@ -285,17 +302,17 @@ private fun SceneAnalyzer(
                     value = input,
                     onValueChange = onInputChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g. A rainy afternoon in a cozy cafe", color = Zinc500) },
+                    placeholder = { Text(strings.inputPlaceholder, color = Zinc500) },
                     enabled = !isLoading,
                     shape = RoundedCornerShape(8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedBorderColor = Color.White,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = Zinc800,
-                        focusedContainerColor = Color.Black,
-                        unfocusedContainerColor = Color.Black
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     )
                 )
 
@@ -308,7 +325,7 @@ private fun SceneAnalyzer(
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(if (isLoading) "Analyzing..." else "Analyze Scene", fontWeight = FontWeight.Bold)
+                    Text(if (isLoading) strings.analyzing else strings.analyzeScene, fontWeight = FontWeight.Bold)
                 }
             }
         }

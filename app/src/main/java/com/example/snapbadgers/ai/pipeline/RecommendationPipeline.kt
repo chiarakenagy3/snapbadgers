@@ -15,6 +15,7 @@ import com.example.snapbadgers.ai.vision.VisionEncoder
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.RecommendationResult
+import com.example.snapbadgers.model.Song
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -52,6 +53,8 @@ class RecommendationPipeline(
     suspend fun warmUp() {
         getOrCreateTextEncoder()
     }
+
+    fun getAllSongs(): List<Song> = songRepository.getAllSongs()
 
     suspend fun runPipeline(
         input: String,

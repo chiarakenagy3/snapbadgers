@@ -8,18 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.snapbadgers.model.InferenceSteps
-import com.example.snapbadgers.ui.theme.Zinc400
-import com.example.snapbadgers.ui.theme.Zinc800
-import com.example.snapbadgers.ui.theme.Zinc900
 
 @Composable
 fun InferenceStatusCard(
@@ -30,13 +27,13 @@ fun InferenceStatusCard(
     hasVisionInput: Boolean
 ) {
     Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Zinc900)
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -49,24 +46,24 @@ fun InferenceStatusCard(
                     text = "Inference Pipeline",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = if (isLoading) "RUNNING" else "READY",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Zinc400
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
             Text(
                 text = "Text encoder: $encoderLabel",
                 style = MaterialTheme.typography.bodySmall,
-                color = Zinc400
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = if (isModelBackedEncoder) "Mode: model-backed" else "Mode: fallback stub",
                 style = MaterialTheme.typography.bodySmall,
-                color = Zinc400
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             StepRow("Text encoding", status = if (steps.textEncoded) "Done" else "Pending")
@@ -91,17 +88,17 @@ fun StepRow(label: String, status: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Zinc800, RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         Text(
             text = status,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
-            color = Zinc400
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }

@@ -10,6 +10,9 @@ Snapbadgers is an Android application that provides personalized music recommend
 - **Song Repository**: Matches the fused embedding against a curated list of songs to find the best match.
 - **Jetpack Compose UI**: A modern, reactive interface that displays inference steps and recommendation results.
 
+## How to find the current song embeddings
+On the phone device manager, under /data/data/com.example.snapbadgers/files/tracks_features.json
+
 ## 🛠 Tech Stack
 
 - **Language**: Kotlin
