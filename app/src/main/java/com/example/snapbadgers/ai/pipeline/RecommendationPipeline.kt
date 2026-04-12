@@ -2,6 +2,7 @@ package com.example.snapbadgers.ai.pipeline
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.projection.ProjectionNetwork
 import com.example.snapbadgers.ai.sensor.SensorCollector
@@ -24,6 +25,7 @@ class RecommendationPipeline(
     context: Context,
     private val songRepository: SongRepository = SongRepository(context)
 ) {
+    private val TAG = "RecommendationPipeline"
     private val appContext = context.applicationContext
     private val useHeuristicTextEncoder = !songRepository.hasEmbeddedCatalog
 
@@ -66,11 +68,13 @@ class RecommendationPipeline(
 
         try {
             sensorCollector.start()
+            Log.d(TAG, "Pipeline started. Input: \"$input\", HasImage: ${imageBitmap != null}")
 
             // Step 1: Text encoding
             delay(120)
             val activeTextEncoder = getOrCreateTextEncoder()
             val textEmbedding = activeTextEncoder.encode(input)
+            Log.d(TAG, "Step 1: Text encoded. Embedding size: ${textEmbedding.size}")
             steps = steps.copy(textEncoded = true)
             onStepUpdate(steps)
 
@@ -78,15 +82,21 @@ class RecommendationPipeline(
             delay(120)
             val visionEmbedding = imageBitmap?.let { bitmap ->
                 val embedding = visionEncoder.encode(bitmap)
+                Log.d(TAG, "Step 2: Vision encoded. Embedding size: ${embedding.size}")
                 steps = steps.copy(visionEncoded = true)
                 onStepUpdate(steps)
                 embedding
+            } ?: run {
+                Log.d(TAG, "Step 2: Vision skipped (no bitmap)")
+                null
             }
 
             // Step 3: Sensor encoding
             delay(120)
             val sensorSample = sensorCollector.getLatestSample()
+            Log.d(TAG, "Step 3: Sensor capture. Accel: (${sensorSample.accelX}, ${sensorSample.accelY}, ${sensorSample.accelZ}), Light: ${sensorSample.light}")
             val sensorEmbedding = sensorEncoder.encode(sensorSample)
+            Log.d(TAG, "Step 3: Sensor encoded. Embedding size: ${sensorEmbedding.size}")
             steps = steps.copy(sensorEncoded = true)
             onStepUpdate(steps)
 
@@ -97,21 +107,25 @@ class RecommendationPipeline(
                 visionEmbedding = visionEmbedding,
                 sensorEmbedding = sensorEmbedding
             )
+            Log.d(TAG, "Step 4: Fusion complete. Embedding size: ${fusedEmbedding.size}")
             steps = steps.copy(fused = true)
             onStepUpdate(steps)
 
             // Step 5: Projection → map fused embedding into song embedding space
             delay(120)
             val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
+            Log.d(TAG, "Step 5: Projection complete. Embedding size: ${projectedEmbedding.size}")
             steps = steps.copy(projected = true)
             onStepUpdate(steps)
 
             // Step 6: Song ranking via cosine similarity
             delay(160)
+            Log.d(TAG, "Step 6: Ranking songs. Catalog size: ${songRepository.getAllSongs().size}")
             val rankedSongs = songRepository.findTopSongs(
                 queryEmbedding = projectedEmbedding,
                 limit = RECOMMENDATION_LIMIT
             )
+            Log.d(TAG, "Step 6: Ranking complete. Top song: ${rankedSongs.firstOrNull()?.title} (Score: ${rankedSongs.firstOrNull()?.similarity})")
             steps = steps.copy(ranked = true)
             onStepUpdate(steps)
 
@@ -124,6 +138,9 @@ class RecommendationPipeline(
                 inferenceTimeMs = inferenceMs,
                 usedVisionInput = imageBitmap != null
             )
+        } catch (e: Exception) {
+            Log.e(TAG, "Pipeline failed", e)
+            throw e
         } finally {
             sensorCollector.stop()
         }
