@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
@@ -66,6 +65,8 @@ import com.example.snapbadgers.ui.i18n.AppI18n
 import com.example.snapbadgers.ui.i18n.AppStrings
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import kotlinx.coroutines.launch
 
 @Composable
@@ -76,21 +77,29 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
     val language by settingsRepository.language
     val strings = AppI18n.forLanguage(language)
 
+    DisposableEffect(pipeline) {
+        onDispose { pipeline.close() }
+    }
+
     var activeTab by remember { mutableStateOf("analyze") }
     var state by remember { mutableStateOf<UiState>(UiState.Idle) }
     var steps by remember { mutableStateOf(InferenceSteps()) }
     var input by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    
+
     val history = remember { mutableStateListOf<HistoryItem>() }
     val allSongs = remember(pipeline) { pipeline.getAllSongs() }
 
     LaunchedEffect(pipeline) {
-        pipeline.warmUp()
+        try {
+            pipeline.warmUp()
+        } catch (_: Exception) {
+            // Warm-up failure is non-fatal; first real inference will handle initialization
+        }
     }
 
-    val hasResult = state is UiState.Success
-    val renderTab = if (hasResult && (activeTab == "analyze" || activeTab == "player")) "player" else activeTab
+    val hasResult by remember { derivedStateOf { state is UiState.Success } }
+    val renderTab by remember { derivedStateOf { if (hasResult && (activeTab == "analyze" || activeTab == "player")) "player" else activeTab } }
 
     Row(
         modifier = Modifier
@@ -113,39 +122,44 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface)
         ) {
+            val onAnalyze: () -> Unit = {
+                scope.launch {
+                    if (input.isBlank() && capturedBitmap == null) {
+                        state = UiState.Error(strings.pleaseProvideInput)
+                        return@launch
+                    }
+                    steps = InferenceSteps()
+                    state = UiState.Loading
+                    try {
+                        val result = pipeline.runPipeline(
+                            input = input,
+                            imageBitmap = capturedBitmap,
+                            onStepUpdate = { steps = it }
+                        )
+                        state = UiState.Success(result)
+                        history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
+                        if (history.size > 50) history.removeRange(50, history.size)
+                        activeTab = "player"
+                    } catch (e: Exception) {
+                        state = UiState.Error(e.message ?: "Error")
+                    }
+                }
+            }
+
             Crossfade(targetState = renderTab, label = "content") { tab ->
                 when (tab) {
                     "analyze" -> SceneAnalyzer(
                         strings = strings,
                         input = input,
-                        onInputChange = { input = it },
+                        onInputChange = { input = it; if (state is UiState.Error) state = UiState.Idle },
                         capturedBitmap = capturedBitmap,
-                        onBitmapCaptured = { capturedBitmap = it },
+                        onBitmapCaptured = { capturedBitmap = it; if (state is UiState.Error) state = UiState.Idle },
                         isLoading = state is UiState.Loading,
+                        errorMessage = (state as? UiState.Error)?.message,
+                        onDismissError = { state = UiState.Idle },
                         steps = steps,
                         pipeline = pipeline,
-                        onAnalyze = {
-                            scope.launch {
-                                if (input.isBlank() && capturedBitmap == null) {
-                                    state = UiState.Error(strings.pleaseProvideInput)
-                                    return@launch
-                                }
-                                steps = InferenceSteps()
-                                state = UiState.Loading
-                                try {
-                                    val result = pipeline.runPipeline(
-                                        input = input,
-                                        imageBitmap = capturedBitmap,
-                                        onStepUpdate = { steps = it }
-                                    )
-                                    state = UiState.Success(result)
-                                    history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
-                                    activeTab = "player"
-                                } catch (e: Exception) {
-                                    state = UiState.Error(e.message ?: "Error")
-                                }
-                            }
-                        }
+                        onAnalyze = onAnalyze
                     )
 
                     "player" -> {
@@ -155,6 +169,7 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
                                 result = successState.result,
                                 encoderLabel = pipeline.textEncoderLabel,
                                 isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
+                                strings = strings,
                                 onReset = {
                                     state = UiState.Idle
                                     activeTab = "analyze"
@@ -165,40 +180,21 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
                         }
                     }
 
-                    "library" -> LibraryScreen(songs = allSongs, language = language)
-                    "activity" -> HistoryScreen(history = history, language = language)
+                    "library" -> LibraryScreen(songs = allSongs, strings = strings)
+                    "activity" -> HistoryScreen(history = history, strings = strings)
                     "settings" -> SettingsScreen(settingsRepository = settingsRepository)
                     else -> SceneAnalyzer(
                         strings = strings,
                         input = input,
-                        onInputChange = { input = it },
+                        onInputChange = { input = it; if (state is UiState.Error) state = UiState.Idle },
                         capturedBitmap = capturedBitmap,
-                        onBitmapCaptured = { capturedBitmap = it },
+                        onBitmapCaptured = { capturedBitmap = it; if (state is UiState.Error) state = UiState.Idle },
                         isLoading = state is UiState.Loading,
+                        errorMessage = (state as? UiState.Error)?.message,
+                        onDismissError = { state = UiState.Idle },
                         steps = steps,
                         pipeline = pipeline,
-                        onAnalyze = {
-                            scope.launch {
-                                if (input.isBlank() && capturedBitmap == null) {
-                                    state = UiState.Error(strings.pleaseProvideInput)
-                                    return@launch
-                                }
-                                steps = InferenceSteps()
-                                state = UiState.Loading
-                                try {
-                                    val result = pipeline.runPipeline(
-                                        input = input,
-                                        imageBitmap = capturedBitmap,
-                                        onStepUpdate = { steps = it }
-                                    )
-                                    state = UiState.Success(result)
-                                    history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
-                                    activeTab = "player"
-                                } catch (e: Exception) {
-                                    state = UiState.Error(e.message ?: "Error")
-                                }
-                            }
-                        }
+                        onAnalyze = onAnalyze
                     )
                 }
             }
@@ -219,25 +215,25 @@ private fun Sidebar(activeTab: String, onTabSelected: (String) -> Unit) {
     ) {
         Icon(
             Icons.Default.AutoAwesome,
-            contentDescription = null,
+            contentDescription = "App logo",
             modifier = Modifier.size(32.dp),
             tint = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        SidebarItem(Icons.Default.Search, "analyze", activeTab == "analyze", onTabSelected)
-        SidebarItem(Icons.Default.LibraryMusic, "library", activeTab == "library", onTabSelected)
-        SidebarItem(Icons.Default.History, "activity", activeTab == "activity", onTabSelected)
+        SidebarItem(Icons.Default.Search, "analyze", "Scene Analyzer", activeTab == "analyze", onTabSelected)
+        SidebarItem(Icons.Default.LibraryMusic, "library", "Music Library", activeTab == "library", onTabSelected)
+        SidebarItem(Icons.Default.History, "activity", "Activity History", activeTab == "activity", onTabSelected)
 
         Spacer(modifier = Modifier.weight(1f))
 
-        SidebarItem(Icons.Default.Settings, "settings", activeTab == "settings", onTabSelected)
+        SidebarItem(Icons.Default.Settings, "settings", "Settings", activeTab == "settings", onTabSelected)
     }
 }
 
 @Composable
-private fun SidebarItem(icon: ImageVector, id: String, isSelected: Boolean, onClick: (String) -> Unit) {
+private fun SidebarItem(icon: ImageVector, id: String, label: String, isSelected: Boolean, onClick: (String) -> Unit) {
     Box(
         modifier = Modifier
             .size(48.dp)
@@ -250,7 +246,7 @@ private fun SidebarItem(icon: ImageVector, id: String, isSelected: Boolean, onCl
     ) {
         Icon(
             icon,
-            contentDescription = id,
+            contentDescription = label,
             tint = if (isSelected) MaterialTheme.colorScheme.onBackground else Zinc500,
             modifier = Modifier.size(24.dp)
         )
@@ -265,6 +261,8 @@ private fun SceneAnalyzer(
     capturedBitmap: Bitmap?,
     onBitmapCaptured: (Bitmap?) -> Unit,
     isLoading: Boolean,
+    errorMessage: String?,
+    onDismissError: () -> Unit,
     steps: InferenceSteps,
     pipeline: RecommendationPipeline,
     onAnalyze: () -> Unit
@@ -304,6 +302,7 @@ private fun SceneAnalyzer(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(strings.inputPlaceholder, color = Zinc500) },
                     enabled = !isLoading,
+                    maxLines = 5,
                     shape = RoundedCornerShape(8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -330,9 +329,42 @@ private fun SceneAnalyzer(
             }
         }
 
+        if (errorMessage != null) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "Dismiss",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { onDismissError() }
+                            .padding(start = 12.dp)
+                    )
+                }
+            }
+        }
+
         CameraInputCard(
             capturedBitmap = capturedBitmap,
             enabled = !isLoading,
+            strings = strings,
             onBitmapCaptured = onBitmapCaptured
         )
 
@@ -341,35 +373,9 @@ private fun SceneAnalyzer(
             isLoading = isLoading,
             encoderLabel = pipeline.textEncoderLabel,
             isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
-            hasVisionInput = capturedBitmap != null
+            hasVisionInput = capturedBitmap != null,
+            strings = strings
         )
     }
 }
 
-@Composable
-private fun PlaceholderContent(title: String, subtitle: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = subtitle,
-                color = Zinc500,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}

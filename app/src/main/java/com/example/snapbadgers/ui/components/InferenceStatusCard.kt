@@ -15,8 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.snapbadgers.model.InferenceSteps
+import com.example.snapbadgers.ui.i18n.AppStrings
 
 @Composable
 fun InferenceStatusCard(
@@ -24,7 +26,8 @@ fun InferenceStatusCard(
     isLoading: Boolean,
     encoderLabel: String,
     isModelBackedEncoder: Boolean,
-    hasVisionInput: Boolean
+    hasVisionInput: Boolean,
+    strings: AppStrings
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -43,22 +46,24 @@ fun InferenceStatusCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Inference Pipeline",
+                    text = strings.inferencePipeline,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (isLoading) "RUNNING" else "READY",
+                    text = if (isLoading) strings.running else strings.ready,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
             Text(
-                text = "Text encoder: $encoderLabel",
+                text = "${strings.textEncoder}: $encoderLabel",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = if (isModelBackedEncoder) "Mode: model-backed" else "Mode: fallback stub",
@@ -84,7 +89,7 @@ fun InferenceStatusCard(
 }
 
 @Composable
-fun StepRow(label: String, status: String) {
+private fun StepRow(label: String, status: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

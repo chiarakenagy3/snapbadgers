@@ -86,6 +86,8 @@ class MainActivity : ComponentActivity() {
             try {
                 // 1. Authentication
                 statusText = "Checking Network..."
+                // SECURITY NOTE: Credentials are compiled into BuildConfig. In production,
+                // use a backend token exchange to avoid shipping the client secret in the APK.
                 val authHeader = "Basic " + Base64.encodeToString("${BuildConfig.SPOTIFY_CLIENT_ID}:${BuildConfig.SPOTIFY_CLIENT_SECRET}".toByteArray(), Base64.NO_WRAP)
                 
                 val tokenResponse = try {
@@ -217,7 +219,9 @@ class MainActivity : ComponentActivity() {
                     val match = tracks.find { it.trackTitle.contains(trackName, true) }
                     if (match != null) return@withContext match
                 }
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                Log.w(TAG, "Deep search failed for $trackName by $artistName", e)
+            }
             null
         }
     }
