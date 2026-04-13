@@ -27,7 +27,7 @@ object VectorUtils {
     ): FloatArray {
         if (dimension <= 0) return FloatArray(0)
         if (vector.isEmpty()) return FloatArray(dimension) { 0f }
-        if (vector.size == dimension) return normalize(vector.copyOf())
+        if (vector.size == dimension) return normalize(vector)
 
         val projected = FloatArray(dimension)
         for (index in vector.indices) {
@@ -42,6 +42,30 @@ object VectorUtils {
         }
 
         return normalize(projected)
+    }
+
+    fun normalizeInPlace(vector: FloatArray) {
+        var sumSquares = 0f
+        for (value in vector) {
+            sumSquares += value * value
+        }
+        val norm = sqrt(sumSquares)
+        if (norm < 1e-8f) {
+            for (index in vector.indices) vector[index] = 0f
+            return
+        }
+        for (index in vector.indices) {
+            vector[index] /= norm
+        }
+    }
+
+    fun cosineSimilarityNormalized(left: FloatArray, right: FloatArray): Float {
+        if (left.isEmpty() || right.isEmpty() || left.size != right.size) return 0f
+        var dotProduct = 0f
+        for (index in left.indices) {
+            dotProduct += left[index] * right[index]
+        }
+        return dotProduct
     }
 
     fun cosineSimilarity(left: FloatArray, right: FloatArray): Float {

@@ -67,7 +67,7 @@ object TextEncoderFactory {
 
     private fun hasAsset(context: Context, assetName: String): Boolean {
         return runCatching {
-            context.assets.open(assetName).close()
+            context.assets.open(assetName).use { }
             true
         }.getOrDefault(false)
     }

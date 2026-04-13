@@ -38,6 +38,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // SECURITY NOTE: Spotify credentials are compiled into BuildConfig as plaintext strings.
+        // In production, use Android Keystore or a backend token exchange. The client secret
+        // should never ship in a release APK. Acceptable for capstone demo scope.
         buildConfigField("String", "SPOTIFY_TOKEN", getQuotedProperty("spotify.token"))
         buildConfigField("String", "SPOTIFY_CLIENT_ID", getQuotedProperty("spotify.client.id"))
         buildConfigField("String", "SPOTIFY_CLIENT_SECRET", getQuotedProperty("spotify.client.secret"))
@@ -46,6 +49,9 @@ android {
 
     buildTypes {
         release {
+            // TODO: Enable R8 minification for release builds. Currently disabled to simplify
+            // debugging during development. Enabling requires ProGuard keep rules for TFLite
+            // reflection, Retrofit/Gson serialization, and Compose stability metadata.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -88,12 +94,17 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
+    // TODO: Migrate pinned dependencies to version catalog (libs.versions.toml).
+    // Retrofit 2.9.0 → 2.11.0, coroutines 1.7.3 → 1.9.0, OkHttp 4.11.0 → 4.12.0.
+    // Pinned versions are acceptable for capstone scope but should be version-cataloged
+    // for maintainability and Dependabot/Renovate compatibility.
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.support)
+    // LiteRT (formerly TensorFlow Lite) — provides Interpreter, NnApiDelegate, DataType.
+    // The tensorflow.lite and tensorflow.lite.support catalog entries were removed as
+    // litert already bundles these classes under the org.tensorflow.lite package namespace.
     implementation(libs.litert)
 
     implementation("com.squareup.okhttp3:okhttp:4.11.0")

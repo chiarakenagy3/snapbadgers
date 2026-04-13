@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import com.example.snapbadgers.ai.common.ml.VectorUtils
-import com.example.snapbadgers.ml.QualcommVisionEncoder
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.math.abs
@@ -83,6 +82,9 @@ class VisionEncoder(
         val stepX = max(1, width / SAMPLE_GRID_SIZE)
         val stepY = max(1, height / SAMPLE_GRID_SIZE)
 
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
         var samples = 0
         var redSum = 0f
         var greenSum = 0f
@@ -91,7 +93,7 @@ class VisionEncoder(
 
         for (y in 0 until height step stepY) {
             for (x in 0 until width step stepX) {
-                val pixel = bitmap.getPixel(x, y)
+                val pixel = pixels[y * width + x]
                 val red = ((pixel shr 16) and 0xFF) / 255f
                 val green = ((pixel shr 8) and 0xFF) / 255f
                 val blue = (pixel and 0xFF) / 255f
@@ -135,7 +137,7 @@ class VisionEncoder(
 
     private fun hasAsset(context: Context, assetName: String): Boolean {
         return runCatching {
-            context.assets.open(assetName).close()
+            context.assets.open(assetName).use { }
             true
         }.getOrDefault(false)
     }

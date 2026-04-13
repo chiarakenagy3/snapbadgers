@@ -17,14 +17,15 @@ import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
 import com.example.snapbadgers.model.RecommendationResult
 import com.example.snapbadgers.model.Song
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class RecommendationPipeline(
     context: Context,
     private val songRepository: SongRepository = SongRepository(context)
-) {
+) : AutoCloseable {
     private val TAG = "RecommendationPipeline"
     private val appContext = context.applicationContext
     private val useHeuristicTextEncoder = !songRepository.hasEmbeddedCatalog
@@ -53,7 +54,8 @@ class RecommendationPipeline(
         get() = (textEncoder?.mode ?: textEncoderDescriptor.mode) == TextEncoderMode.MODEL
 
     suspend fun warmUp() {
-        getOrCreateTextEncoder()
+        val encoder = getOrCreateTextEncoder()
+        encoder.encode("")
     }
 
     fun getAllSongs(): List<Song> = songRepository.getAllSongs()
@@ -68,40 +70,45 @@ class RecommendationPipeline(
 
         try {
             sensorCollector.start()
-            Log.d(TAG, "Pipeline started. Input: \"$input\", HasImage: ${imageBitmap != null}")
+            Log.d(TAG, "Pipeline started. InputLength: ${input.length}, HasImage: ${imageBitmap != null}")
 
-            // Step 1: Text encoding
-            delay(120)
-            val activeTextEncoder = getOrCreateTextEncoder()
-            val textEmbedding = activeTextEncoder.encode(input)
-            Log.d(TAG, "Step 1: Text encoded. Embedding size: ${textEmbedding.size}")
-            steps = steps.copy(textEncoded = true)
-            onStepUpdate(steps)
+            val (textEmbedding, visionEmbedding, sensorEmbedding) = coroutineScope {
+                val textDeferred = async {
+                    val activeTextEncoder = getOrCreateTextEncoder()
+                    val embedding = activeTextEncoder.encode(input)
+                    Log.d(TAG, "Step 1: Text encoded. Embedding size: ${embedding.size}")
+                    steps = steps.copy(textEncoded = true)
+                    onStepUpdate(steps)
+                    embedding
+                }
 
-            // Step 2: Vision encoding (only if bitmap provided)
-            delay(120)
-            val visionEmbedding = imageBitmap?.let { bitmap ->
-                val embedding = visionEncoder.encode(bitmap)
-                Log.d(TAG, "Step 2: Vision encoded. Embedding size: ${embedding.size}")
-                steps = steps.copy(visionEncoded = true)
-                onStepUpdate(steps)
-                embedding
-            } ?: run {
-                Log.d(TAG, "Step 2: Vision skipped (no bitmap)")
-                null
+                val visionDeferred = async {
+                    imageBitmap?.let { bitmap ->
+                        val embedding = visionEncoder.encode(bitmap)
+                        Log.d(TAG, "Step 2: Vision encoded. Embedding size: ${embedding.size}")
+                        steps = steps.copy(visionEncoded = true)
+                        onStepUpdate(steps)
+                        embedding
+                    } ?: run {
+                        Log.d(TAG, "Step 2: Vision skipped (no bitmap)")
+                        null
+                    }
+                }
+
+                val sensorDeferred = async {
+                    val sensorSample = sensorCollector.getLatestSample()
+                    Log.d(TAG, "Step 3: Sensor capture complete")
+                    val embedding = sensorEncoder.encode(sensorSample)
+                    Log.d(TAG, "Step 3: Sensor encoded. Embedding size: ${embedding.size}")
+                    steps = steps.copy(sensorEncoded = true)
+                    onStepUpdate(steps)
+                    embedding
+                }
+
+                Triple(textDeferred.await(), visionDeferred.await(), sensorDeferred.await())
             }
 
-            // Step 3: Sensor encoding
-            delay(120)
-            val sensorSample = sensorCollector.getLatestSample()
-            Log.d(TAG, "Step 3: Sensor capture. Accel: (${sensorSample.accelX}, ${sensorSample.accelY}, ${sensorSample.accelZ}), Light: ${sensorSample.light}")
-            val sensorEmbedding = sensorEncoder.encode(sensorSample)
-            Log.d(TAG, "Step 3: Sensor encoded. Embedding size: ${sensorEmbedding.size}")
-            steps = steps.copy(sensorEncoded = true)
-            onStepUpdate(steps)
-
             // Step 4: Fusion → 128-d fused context embedding
-            delay(120)
             val fusedEmbedding = fusionEngine.fuse(
                 textEmbedding   = textEmbedding,
                 visionEmbedding = visionEmbedding,
@@ -112,14 +119,12 @@ class RecommendationPipeline(
             onStepUpdate(steps)
 
             // Step 5: Projection → map fused embedding into song embedding space
-            delay(120)
             val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
             Log.d(TAG, "Step 5: Projection complete. Embedding size: ${projectedEmbedding.size}")
             steps = steps.copy(projected = true)
             onStepUpdate(steps)
 
             // Step 6: Song ranking via cosine similarity
-            delay(160)
             Log.d(TAG, "Step 6: Ranking songs. Catalog size: ${songRepository.getAllSongs().size}")
             val rankedSongs = songRepository.findTopSongs(
                 queryEmbedding = projectedEmbedding,
@@ -144,6 +149,11 @@ class RecommendationPipeline(
         } finally {
             sensorCollector.stop()
         }
+    }
+
+    override fun close() {
+        (textEncoder as? AutoCloseable)?.close()
+        visionEncoder.close()
     }
 
     private companion object {

@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 
+// SECURITY NOTE: This repository uses plaintext SharedPreferences. Spotify API keys and
+// user PII (email, display name) are stored unencrypted on disk. For a production app,
+// migrate to EncryptedSharedPreferences from androidx.security:security-crypto.
+// Acceptable for capstone demo scope — documented as a known limitation.
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences("snapbadgers_prefs", Context.MODE_PRIVATE)
 

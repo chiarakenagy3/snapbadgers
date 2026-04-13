@@ -134,19 +134,19 @@ class ProjectionNetwork(
      * Replace with loadWeights() once trained weights are available.
      */
     private fun initWeights() {
-        val rng = java.util.Random(42)
+        val rng = kotlin.random.Random(42)
         val scale1 = sqrt(2.0 / inputDim).toFloat()
         val scale2 = sqrt(2.0 / hiddenDim).toFloat()
 
         for (i in 0 until hiddenDim) {
             b1[i] = 0f
             for (j in 0 until inputDim)
-                w1[i][j] = rng.nextGaussian().toFloat() * scale1
+                w1[i][j] = rng.nextFloat() * 2f * scale1 - scale1
         }
         for (i in 0 until outputDim) {
             b2[i] = 0f
             for (j in 0 until hiddenDim)
-                w2[i][j] = rng.nextGaussian().toFloat() * scale2
+                w2[i][j] = rng.nextFloat() * 2f * scale2 - scale2
         }
     }
 }

@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -14,8 +15,20 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlin.random.Random
 
+/**
+ * MLP projector that maps 15-d audio features into 128-d song embedding space.
+ *
+ * Uses a quantized TFLite model when available, with a deterministic manual fallback
+ * (He-initialized weights, seed 42) for environments where the model asset is missing.
+ *
+ * NOTE: Previously used deprecated [Interpreter.Options.setUseNNAPI]. Now uses
+ * [NnApiDelegate] directly, which itself is deprecated starting Android 15 (SDK 35).
+ * TODO: Replace NnApiDelegate with GpuDelegate when tensorflow-lite-gpu is added.
+ */
 object MLPProjector {
-    private var interpreter: Interpreter? = null
+    private const val TAG = "MLPProjector"
+    @Volatile private var interpreter: Interpreter? = null
+    @Volatile private var nnApiDelegate: NnApiDelegate? = null
 
     private const val INPUT_DIM = 15
     private const val HIDDEN_DIM = 64
@@ -37,41 +50,41 @@ object MLPProjector {
 
     fun init(context: Context, modelPath: String = "mlp_quantized.tflite") {
         try {
-            Log.d("MLP", "init() called")
+            Log.d(TAG, "Initializing TFLite interpreter")
             val fileDescriptor = context.assets.openFd(modelPath)
-            val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
-            val fileChannel = inputStream.channel
-            val modelBuffer: MappedByteBuffer = fileChannel.map(
-                FileChannel.MapMode.READ_ONLY,
-                fileDescriptor.startOffset,
-                fileDescriptor.declaredLength
-            )
+            val modelBuffer: MappedByteBuffer = try {
+                val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+                try {
+                    inputStream.channel.map(
+                        FileChannel.MapMode.READ_ONLY,
+                        fileDescriptor.startOffset,
+                        fileDescriptor.declaredLength
+                    )
+                } finally {
+                    inputStream.close()
+                }
+            } finally {
+                fileDescriptor.close()
+            }
 
             val options = Interpreter.Options().apply {
                 setNumThreads(4)
-                setUseNNAPI(true)
+            }
+
+            try {
+                nnApiDelegate = NnApiDelegate()
+                options.addDelegate(nnApiDelegate)
+                Log.d(TAG, "NNAPI delegate attached")
+            } catch (e: Throwable) {
+                Log.w(TAG, "NNAPI delegate unavailable, using CPU", e)
+                nnApiDelegate?.close()
+                nnApiDelegate = null
             }
 
             interpreter = Interpreter(modelBuffer, options)
-            debugModel(interpreter!!)
         } catch (e: Exception) {
-            Log.e("MLP", "Model load failed", e)
+            Log.e(TAG, "Model load failed", e)
         }
-    }
-
-    fun debugModel(interpreter: Interpreter) {
-        val input = interpreter.getInputTensor(0)
-        val output = interpreter.getOutputTensor(0)
-
-        Log.d("MLP", "Input type: ${input.dataType()}")
-        Log.d("MLP", "Input shape: ${input.shape().contentToString()}")
-        val iq = input.quantizationParams()
-        Log.d("MLP", "Input scale: ${iq.scale}, zeroPoint: ${iq.zeroPoint}")
-
-        Log.d("MLP", "Output type: ${output.dataType()}")
-        Log.d("MLP", "Output shape: ${output.shape().contentToString()}")
-        val oq = output.quantizationParams()
-        Log.d("MLP", "Output scale: ${oq.scale}, zeroPoint: ${oq.zeroPoint}")
     }
 
     fun project(input: FloatArray): FloatArray {
@@ -84,7 +97,7 @@ object MLPProjector {
         return try {
             runQuantizedOrFloat(interp, input)
         } catch (e: Exception) {
-            Log.e("MLP", "TFLite inference failed, fallback to manualProject()", e)
+            Log.e(TAG, "TFLite inference failed, falling back to manual projection", e)
             manualProject(input)
         }
     }

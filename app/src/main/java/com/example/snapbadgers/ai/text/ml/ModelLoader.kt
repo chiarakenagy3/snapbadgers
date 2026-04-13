@@ -7,14 +7,19 @@ import java.nio.channels.FileChannel
 object ModelLoader {
     fun loadMappedFile(context: Context, assetName: String): MappedByteBuffer {
         val fileDescriptor = context.assets.openFd(assetName)
-        val inputStream = fileDescriptor.createInputStream()
-        val fileChannel = inputStream.channel
-        return fileChannel.map(
-            FileChannel.MapMode.READ_ONLY,
-            fileDescriptor.startOffset,
-            fileDescriptor.declaredLength
-        ).also {
-            inputStream.close()
+        return try {
+            val inputStream = fileDescriptor.createInputStream()
+            try {
+                val fileChannel = inputStream.channel
+                fileChannel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    fileDescriptor.startOffset,
+                    fileDescriptor.declaredLength
+                )
+            } finally {
+                inputStream.close()
+            }
+        } finally {
             fileDescriptor.close()
         }
     }

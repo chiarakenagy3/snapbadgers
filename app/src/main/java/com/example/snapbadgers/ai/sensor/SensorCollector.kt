@@ -21,10 +21,11 @@ class SensorCollector(context: Context) {
     private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
 
-    private var latestAccelX = 0f
-    private var latestAccelY = 0f
-    private var latestAccelZ = 0f
-    private var latestLight = 0f
+    @Volatile private var latestAccelX = 0f
+    @Volatile private var latestAccelY = 0f
+    @Volatile private var latestAccelZ = 0f
+    @Volatile private var latestLight = 0f
+    @Volatile private var isRegistered = false
 
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -44,16 +45,20 @@ class SensorCollector(context: Context) {
     }
 
     fun start() {
+        if (isRegistered) return
         accelerometer?.also {
             sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
         lightSensor?.also {
             sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+        isRegistered = true
     }
 
     fun stop() {
+        if (!isRegistered) return
         sensorManager.unregisterListener(listener)
+        isRegistered = false
     }
 
     fun getLatestSample(): SensorSample {
