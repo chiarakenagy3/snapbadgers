@@ -3,7 +3,8 @@ package com.example.snapbadgers.ai.vision
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import com.example.snapbadgers.ai.common.ml.VectorUtils
+import androidx.core.graphics.get
+import com.example.snapbadgers.ai.common.ml.*
 import com.example.snapbadgers.ml.QualcommVisionEncoder
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,10 +27,7 @@ class VisionEncoder(
             return encodeStub(bitmap)
         }
 
-        val activeModelEncoder = getOrCreateModelEncoder()
-        if (activeModelEncoder == null) {
-            return encodeStub(bitmap)
-        }
+        val activeModelEncoder = getOrCreateModelEncoder() ?: return encodeStub(bitmap)
 
         return try {
             val embedding = activeModelEncoder.encode(bitmap)
@@ -38,6 +36,7 @@ class VisionEncoder(
                 switchToStubFallback()
                 encodeStub(bitmap)
             } else {
+                // Now passes through directly if 128-d thanks to VectorUtils update
                 VectorUtils.alignToEmbeddingDimension(embedding, salt = MODEL_OUTPUT_SALT)
             }
         } catch (throwable: Throwable) {
@@ -91,7 +90,7 @@ class VisionEncoder(
 
         for (y in 0 until height step stepY) {
             for (x in 0 until width step stepX) {
-                val pixel = bitmap.getPixel(x, y)
+                val pixel = bitmap[x, y]
                 val red = ((pixel shr 16) and 0xFF) / 255f
                 val green = ((pixel shr 8) and 0xFF) / 255f
                 val blue = (pixel and 0xFF) / 255f
@@ -105,28 +104,40 @@ class VisionEncoder(
             }
         }
 
-        if (samples == 0) {
-            return FloatArray(128)
-        }
+        val embedding = FloatArray(EMBEDDING_DIMENSION)
+        if (samples == 0) return embedding
 
         val avgRed = redSum / samples
         val avgGreen = greenSum / samples
         val avgBlue = blueSum / samples
         val avgBrightness = brightnessSum / samples
-        val aspectRatio = width.toFloat() / height.toFloat()
-        val colorBalance = avgRed - avgBlue
+        
+        // --- Standard Feature Mapping ---
+        
+        // Brightness correlates with Energy and Valence (Happy)
+        embedding[IDX_VALENCE] = avgBrightness
+        embedding[IDX_ENERGY] = avgBrightness
+        
+        // High blue content often suggests a "chill" or "mellow" (low energy, high acoustic) vibe
+        if (avgBlue > avgRed && avgBlue > avgGreen) {
+            embedding[IDX_ENERGY] = (embedding[IDX_ENERGY] * 0.8f).coerceAtLeast(0.1f)
+            embedding[IDX_ACOUSTICNESS] = (avgBlue - max(avgRed, avgGreen)).coerceIn(0f, 1f)
+        }
+        
+        // High red content often suggests "intensity" or "passion"
+        if (avgRed > avgBlue && avgRed > avgGreen) {
+            embedding[IDX_ENERGY] = (embedding[IDX_ENERGY] * 1.2f).coerceIn(0f, 1f)
+            embedding[IDX_DANCEABILITY] = avgRed
+        }
 
-        val raw = floatArrayOf(
-            (width / 2000f).coerceIn(0f, 1f),
-            (height / 2000f).coerceIn(0f, 1f),
-            aspectRatio.coerceIn(0.1f, 4f) / 4f,
-            avgRed,
-            avgGreen,
-            avgBlue,
-            avgBrightness,
-            abs(colorBalance)
-        )
-        return VectorUtils.alignToEmbeddingDimension(raw, salt = STUB_OUTPUT_SALT)
+        // --- Geometric Backup (indices 10+) ---
+        embedding[10] = (width / 2000f).coerceIn(0f, 1f)
+        embedding[11] = (height / 2000f).coerceIn(0f, 1f)
+        embedding[12] = avgRed
+        embedding[13] = avgGreen
+        embedding[14] = avgBlue
+
+        return VectorUtils.normalize(embedding)
     }
 
     private fun isZeroVector(vector: FloatArray): Boolean {
@@ -159,6 +170,5 @@ class VisionEncoder(
         const val SAMPLE_GRID_SIZE = 16
         const val ZERO_THRESHOLD = 1e-6f
         const val MODEL_OUTPUT_SALT = 211
-        const val STUB_OUTPUT_SALT = 223
     }
 }
