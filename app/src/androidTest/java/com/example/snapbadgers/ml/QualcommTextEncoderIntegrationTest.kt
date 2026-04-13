@@ -1,7 +1,8 @@
 package com.example.snapbadgers.ml
 
 import androidx.test.platform.app.InstrumentationRegistry
-import com.example.snapbadgers.domain.Tokenizer
+import com.example.snapbadgers.ai.text.ml.BertTokenizer
+import com.example.snapbadgers.ai.text.ml.QualcommTextEncoder
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

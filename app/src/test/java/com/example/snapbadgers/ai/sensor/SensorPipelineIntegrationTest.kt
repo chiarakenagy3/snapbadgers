@@ -1,4 +1,4 @@
-package com.example.snapbadgers.sensor
+package com.example.snapbadgers.ai.sensor
 
 import com.example.snapbadgers.testing.BaseUnitTest
 import com.example.snapbadgers.testing.TestFixtures

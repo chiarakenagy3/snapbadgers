@@ -4,8 +4,9 @@ import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.projection.ProjectionNetwork
-import com.example.snapbadgers.ai.sensor.SensorSample
-import com.example.snapbadgers.ai.sensor.SensorEncoder as AiSensorEncoder
+import com.example.snapbadgers.ai.sensor.SensorData
+import com.example.snapbadgers.ai.sensor.SensorEncoderMLP
+import com.example.snapbadgers.ai.sensor.SensorFeatureExtractor
 import com.example.snapbadgers.ai.text.HeuristicTextEmbedding
 import com.example.snapbadgers.model.Song
 import com.example.snapbadgers.songembeddings.embedding.MLPProjector
@@ -91,9 +92,12 @@ class PipelineCorrectnessEvalTest {
         // Step 1: Encode text
         val textEmbedding = HeuristicTextEmbedding.encode("calm relaxing study music")
 
-        // Step 2: Create stub sensor embedding
-        val sensorEncoder = AiSensorEncoder()
-        val sensorEmbedding = sensorEncoder.encode(SensorSample(0f, 9.8f, 0f, 200f))
+        // Step 2: Create sensor embedding
+        val sensorData = SensorData(
+            accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
+            lightLux = 200f
+        )
+        val sensorEmbedding = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
 
         // Step 3: Fuse (no vision)
         val fusedEmbedding = fusionEngine.fuse(
@@ -232,12 +236,15 @@ class PipelineCorrectnessEvalTest {
     @Test
     fun `same pipeline inputs produce same recommendations`() {
         val input = "happy upbeat dance party"
-        val sensorSample = SensorSample(1f, 9.8f, -0.5f, 300f)
-        val sensorEncoder = AiSensorEncoder()
+        val sensorData = SensorData(
+            accelWindow = listOf(floatArrayOf(1f, 9.8f, -0.5f)),
+            lightLux = 300f
+        )
+        val sensorEncoder = SensorEncoderMLP()
 
         fun runPipeline(): List<Pair<String, Float>> {
             val text = HeuristicTextEmbedding.encode(input)
-            val sensor = sensorEncoder.encode(sensorSample)
+            val sensor = sensorEncoder.encode(SensorFeatureExtractor.extract(sensorData))
             val fused = fusionEngine.fuse(text, null, sensor)
             val projected = projectionNetwork.project(fused)
             val query = VectorUtils.alignToEmbeddingDimension(projected, salt = 101)
@@ -259,11 +266,14 @@ class PipelineCorrectnessEvalTest {
     @Test
     fun `pipeline determinism across 50 runs`() {
         val input = "calm study lo-fi ambient"
-        val sensorEncoder = AiSensorEncoder()
 
         fun runPipeline(): List<Float> {
             val text = HeuristicTextEmbedding.encode(input)
-            val sensor = sensorEncoder.encode(SensorSample(0f, 9.8f, 0f, 100f))
+            val sensorData = SensorData(
+                accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
+                lightLux = 100f
+            )
+            val sensor = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
             val fused = fusionEngine.fuse(text, null, sensor)
             val projected = projectionNetwork.project(fused)
             val query = VectorUtils.alignToEmbeddingDimension(projected, salt = 101)
@@ -292,9 +302,12 @@ class PipelineCorrectnessEvalTest {
         val textEmbedding = HeuristicTextEmbedding.encode("test input")
         assertEquals("Text embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, textEmbedding.size)
 
-        val sensorEncoder = AiSensorEncoder()
-        val sensorEmbedding = sensorEncoder.encode(SensorSample(0f, 9.8f, 0f, 100f))
-        assertEquals("Sensor embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, sensorEmbedding.size)
+        val sensorData = SensorData(
+            accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
+            lightLux = 100f
+        )
+        val sensorEmbedding = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
+        assertEquals("Sensor embedding should be 32-d (MLP output)", 32, sensorEmbedding.size)
 
         val fused = fusionEngine.fuse(textEmbedding, null, sensorEmbedding)
         assertEquals("Fused embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, fused.size)
@@ -308,8 +321,11 @@ class PipelineCorrectnessEvalTest {
     @Test
     fun `all pipeline outputs are L2-normalized`() {
         val text = HeuristicTextEmbedding.encode("test music")
-        val sensorEncoder = AiSensorEncoder()
-        val sensor = sensorEncoder.encode(SensorSample(0f, 9.8f, 0f, 100f))
+        val sensorData = SensorData(
+            accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
+            lightLux = 100f
+        )
+        val sensor = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
         val fused = fusionEngine.fuse(text, null, sensor)
         val projected = projectionNetwork.project(fused)
 

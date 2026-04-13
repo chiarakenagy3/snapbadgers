@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.projection.ProjectionNetwork
-import com.example.snapbadgers.ai.sensor.SensorCollector
 import com.example.snapbadgers.ai.sensor.SensorEncoder
 import com.example.snapbadgers.ai.text.TextEncoderDescriptor
 import com.example.snapbadgers.ai.text.TextEncoder
@@ -41,8 +40,7 @@ class RecommendationPipeline(
         TextEncoderFactory.describe(appContext)
     }
 
-    private val sensorCollector   = SensorCollector(appContext)
-    private val sensorEncoder     = SensorEncoder()
+    private val sensorEncoder     = SensorEncoder(appContext)
     private val visionEncoder     = VisionEncoder(appContext)  
     private val fusionEngine      = FusionEngine()
     private val projectionNetwork = ProjectionNetwork()        
@@ -69,7 +67,7 @@ class RecommendationPipeline(
         val startMs = System.currentTimeMillis()
 
         try {
-            sensorCollector.start()
+            sensorEncoder.start()
             Log.d(TAG, "Pipeline started. InputLength: ${input.length}, HasImage: ${imageBitmap != null}")
 
             val (textEmbedding, visionEmbedding, sensorEmbedding) = coroutineScope {
@@ -96,9 +94,7 @@ class RecommendationPipeline(
                 }
 
                 val sensorDeferred = async {
-                    val sensorSample = sensorCollector.getLatestSample()
-                    Log.d(TAG, "Step 3: Sensor capture complete")
-                    val embedding = sensorEncoder.encode(sensorSample)
+                    val embedding = sensorEncoder.getEmbedding()
                     Log.d(TAG, "Step 3: Sensor encoded. Embedding size: ${embedding.size}")
                     steps = steps.copy(sensorEncoded = true)
                     onStepUpdate(steps)
@@ -147,7 +143,7 @@ class RecommendationPipeline(
             Log.e(TAG, "Pipeline failed", e)
             throw e
         } finally {
-            sensorCollector.stop()
+            sensorEncoder.stop()
         }
     }
 

@@ -5,7 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.snapbadgers.ai.text.ml.BertTokenizer
 import com.example.snapbadgers.ai.text.ml.QualcommTextEncoder
-import com.example.snapbadgers.ml.QualcommVisionEncoder
+import com.example.snapbadgers.ai.vision.QualcommVisionEncoder
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*

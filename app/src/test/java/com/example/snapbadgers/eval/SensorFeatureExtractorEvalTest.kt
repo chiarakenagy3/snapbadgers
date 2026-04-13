@@ -1,8 +1,8 @@
 package com.example.snapbadgers.eval
 
-import com.example.snapbadgers.sensor.SensorData
-import com.example.snapbadgers.sensor.SensorEncoderMLP
-import com.example.snapbadgers.sensor.SensorFeatureExtractor
+import com.example.snapbadgers.ai.sensor.SensorData
+import com.example.snapbadgers.ai.sensor.SensorEncoderMLP
+import com.example.snapbadgers.ai.sensor.SensorFeatureExtractor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before

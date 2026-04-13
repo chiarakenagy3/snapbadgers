@@ -2,7 +2,7 @@ package com.example.snapbadgers.testing
 
 import android.graphics.Bitmap
 import com.example.snapbadgers.model.Song
-import com.example.snapbadgers.sensor.SensorData
+import com.example.snapbadgers.ai.sensor.SensorData
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
 
 /**

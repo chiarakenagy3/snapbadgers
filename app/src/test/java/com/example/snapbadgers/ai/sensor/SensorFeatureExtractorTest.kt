@@ -1,4 +1,4 @@
-package com.example.snapbadgers.sensor
+package com.example.snapbadgers.ai.sensor
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
