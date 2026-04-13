@@ -56,16 +56,21 @@ class VisionEncoder(
         if (forceStubFallback) return null
 
         return modelInitMutex.withLock {
-            modelEncoder?.let { return it }
-            if (forceStubFallback) return null
-
-            return runCatching {
-                QualcommVisionEncoder(context = appContext, modelPath = modelAsset)
-            }.onFailure { throwable ->
-                logWarning("Vision model initialization failed. Falling back to stub image encoder.", throwable)
-                forceStubFallback = true
-            }.getOrNull()?.also { initializedEncoder ->
-                modelEncoder = initializedEncoder
+            // Double-check status after acquiring lock
+            val existing = modelEncoder
+            if (existing != null) {
+                existing
+            } else if (forceStubFallback) {
+                null
+            } else {
+                runCatching {
+                    QualcommVisionEncoder(context = appContext, modelPath = modelAsset)
+                }.onFailure { throwable ->
+                    logWarning("Vision model initialization failed. Falling back to stub image encoder.", throwable)
+                    forceStubFallback = true
+                }.getOrNull()?.also { initializedEncoder ->
+                    modelEncoder = initializedEncoder
+                }
             }
         }
     }
