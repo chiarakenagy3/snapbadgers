@@ -36,9 +36,6 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
-    private val TAG = "SnapBadger"
-    private val RECCOBEATS_BASE_URL = "https://api.reccobeats.com/"
-
     // UI State
     private var statusText by mutableStateOf("Ready")
     private var logText by mutableStateOf("")
@@ -51,7 +48,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Essential: Initialize the MLP Projector
         MLPProjector.init(this)
 
         setContent {
@@ -109,7 +105,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                val spotifyToken = "Bearer ${tokenResponse.access_token}"
+                val spotifyToken = "Bearer ${tokenResponse.accessToken}"
 
                 // 2. Fetch Top Tracks
                 statusText = "Fetching Top Tracks..."
@@ -224,5 +220,10 @@ class MainActivity : ComponentActivity() {
             }
             null
         }
+    }
+
+    private companion object {
+        const val TAG = "SnapBadger"
+        const val RECCOBEATS_BASE_URL = "https://api.reccobeats.com/"
     }
 }

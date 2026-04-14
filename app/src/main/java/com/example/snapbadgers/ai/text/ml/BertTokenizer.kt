@@ -35,7 +35,7 @@ class BertTokenizer(
                         substring = "##$substring"
                     }
 
-                    if (vocab.containsKey(substring)) {
+                    if (substring in vocab) {
                         currentSubword = substring
                         break
                     }
@@ -61,11 +61,7 @@ class BertTokenizer(
             context.assets.open(vocabFile).use { inputStream ->
                 BufferedReader(InputStreamReader(inputStream)).use { reader ->
                     var index = 0
-                    var line = reader.readLine()
-                    while (line != null) {
-                        vocab[line.trim()] = index++
-                        line = reader.readLine()
-                    }
+                    reader.forEachLine { line -> vocab[line.trim()] = index++ }
                 }
             }
             return BertTokenizer(vocab)

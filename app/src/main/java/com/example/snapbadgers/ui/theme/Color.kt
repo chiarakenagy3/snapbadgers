@@ -2,7 +2,7 @@ package com.example.snapbadgers.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Tailwind Zinc / Dark mode colors
+// Tailwind Zinc palette
 val Zinc950 = Color(0xFF09090B)
 val Zinc900 = Color(0xFF18181B)
 val Zinc800 = Color(0xFF27272A)

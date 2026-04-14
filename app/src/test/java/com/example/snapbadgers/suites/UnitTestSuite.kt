@@ -1,7 +1,6 @@
 package com.example.snapbadgers.suites
 
 import com.example.snapbadgers.EmbeddingTest
-import com.example.snapbadgers.ExampleUnitTest
 import com.example.snapbadgers.ai.common.ml.VectorUtilsTest
 import com.example.snapbadgers.ai.fusion.FusionEngineTest
 import com.example.snapbadgers.ai.projection.ProjectionNetworkTest
@@ -44,7 +43,6 @@ import org.junit.runners.Suite
     SongEmbeddingPerformanceTest::class,
 
     // Legacy
-    EmbeddingTest::class,
-    ExampleUnitTest::class
+    EmbeddingTest::class
 )
 class UnitTestSuite

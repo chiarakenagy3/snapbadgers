@@ -13,12 +13,12 @@ class EmbeddingUtilsTest {
         danceability: Float = 0.5f, energy: Float = 0.5f, speechiness: Float = 0.05f,
         acousticness: Float = 0.3f, instrumentalness: Float = 0.0f, liveness: Float = 0.1f,
         valence: Float = 0.5f, tempo: Float = 120f, loudness: Float = -5f,
-        duration_ms: Int = 200000
+        durationMs: Int = 200000
     ) = AudioFeatures(
         id = "test_track", danceability = danceability, energy = energy, key = 0,
         loudness = loudness, mode = 1, speechiness = speechiness, acousticness = acousticness,
         instrumentalness = instrumentalness, liveness = liveness, valence = valence,
-        tempo = tempo, duration_ms = duration_ms.toFloat()
+        tempo = tempo, durationMs = durationMs.toFloat()
     )
 
     @Test
@@ -28,7 +28,7 @@ class EmbeddingUtilsTest {
 
     @Test
     fun `buildBaseVector normalizes all values to 0-1 range`() {
-        val base = buildBaseVector(af(danceability = 0.8f, energy = 0.9f, tempo = 120f, loudness = -5f, duration_ms = 200000))
+        val base = buildBaseVector(af(danceability = 0.8f, energy = 0.9f, tempo = 120f, loudness = -5f, durationMs = 200000))
         assertTrue("All base features in [0, 1]", base.all { it in 0f..1f })
     }
 
@@ -40,7 +40,7 @@ class EmbeddingUtilsTest {
         ).forEach { (features, idx) ->
             assertTrue("Index $idx normalized", buildBaseVector(features)[idx] in 0f..1f)
         }
-        assertTrue("Duration clamped to max", buildBaseVector(af(duration_ms = 600000))[9] <= 2f)
+        assertTrue("Duration clamped to max", buildBaseVector(af(durationMs = 600000))[9] <= 2f)
     }
 
     @Test
@@ -154,7 +154,7 @@ class EmbeddingUtilsTest {
             af(danceability = 1f, energy = 1f),
             af(tempo = 0f),
             af(loudness = -60f),
-            af(duration_ms = 1000),
+            af(durationMs = 1000),
         ).forEach { features ->
             val embedding = getEmbedding(features)
             assertEquals(128, embedding.size)

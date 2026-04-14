@@ -49,9 +49,9 @@ android {
 
     buildTypes {
         release {
-            // TODO: Enable R8 minification for release builds. Currently disabled to simplify
-            // debugging during development. Enabling requires ProGuard keep rules for TFLite
-            // reflection, Retrofit/Gson serialization, and Compose stability metadata.
+            // R8 minification is disabled to simplify debugging during development.
+            // Enabling requires ProGuard keep rules for TFLite reflection,
+            // Retrofit/Gson serialization, and Compose stability metadata.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -95,10 +95,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
-    // TODO: Migrate pinned dependencies to version catalog (libs.versions.toml).
-    // Retrofit 2.9.0 → 2.11.0, coroutines 1.7.3 → 1.9.0, OkHttp 4.11.0 → 4.12.0.
-    // Pinned versions are acceptable for capstone scope but should be version-cataloged
-    // for maintainability and Dependabot/Renovate compatibility.
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

@@ -3,8 +3,6 @@ package com.example.snapbadgers.ai.sensor
 import com.example.snapbadgers.ai.common.ml.TwoLayerMLP
 
 /**
- * SensorEncoderMLP
- *
  * A tiny 2-layer MLP running entirely on-device (no framework needed).
  *
  * Architecture:

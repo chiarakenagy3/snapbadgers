@@ -18,7 +18,6 @@ import java.nio.ByteOrder
  * NOTE: [NnApiDelegate] is deprecated starting Android 15 (SDK 35). The recommended
  * migration path is QNN delegate → GPU delegate → XNNPack. QNN requires the
  * Qualcomm AI Engine Direct SDK which is not yet stable for general use.
- * TODO: Replace NnApiDelegate with GpuDelegate when tensorflow-lite-gpu is added.
  */
 class QualcommVisionEncoder(
     private val context: Context,

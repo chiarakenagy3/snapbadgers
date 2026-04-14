@@ -105,7 +105,7 @@ class PipelineCorrectnessEvalTest {
         val audioFeatures = AudioFeatures(
             id = "test", danceability = 0.7f, energy = 0.6f, speechiness = 0.04f,
             acousticness = 0.2f, instrumentalness = 0.1f, liveness = 0.3f, valence = 0.8f,
-            tempo = 128f, loudness = -8f, key = 5, mode = 1, duration_ms = 180000f
+            tempo = 128f, loudness = -8f, key = 5, mode = 1, durationMs = 180000f
         )
 
         val combined = buildBaseVector(audioFeatures).let { it + addDerivedFeatures(it) }

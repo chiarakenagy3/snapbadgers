@@ -24,7 +24,6 @@ import kotlin.random.Random
  *
  * NOTE: Previously used deprecated [Interpreter.Options.setUseNNAPI]. Now uses
  * [NnApiDelegate] directly, which itself is deprecated starting Android 15 (SDK 35).
- * TODO: Replace NnApiDelegate with GpuDelegate when tensorflow-lite-gpu is added.
  */
 object MLPProjector {
     private const val TAG = "MLPProjector"
@@ -265,7 +264,7 @@ fun buildBaseVector(f: AudioFeatures): FloatArray {
         f.valence,
         (f.tempo / 200f).coerceIn(0f, 1f),
         (f.loudness + 60f).coerceIn(0f, 60f) / 60f,
-        (f.duration_ms / 300000f).coerceIn(0f, 2f)
+        (f.durationMs / 300000f).coerceIn(0f, 2f)
     )
 }
 

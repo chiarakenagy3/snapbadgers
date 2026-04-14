@@ -4,8 +4,6 @@ import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.TwoLayerMLP
 
 /**
- * ProjectionNetwork
- *
  * Maps the 128-d fused context embedding into the song embedding space
  * so that cosine similarity against song embeddings is meaningful.
  *

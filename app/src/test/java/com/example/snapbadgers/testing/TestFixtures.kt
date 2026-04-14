@@ -7,13 +7,8 @@ import com.example.snapbadgers.songembeddings.model.AudioFeatures
 
 /**
  * Shared test fixtures and data builders for consistent test data across the test suite.
- *
- * Industry best practice: Centralize test data creation to ensure consistency,
- * reduce duplication, and make tests more maintainable.
  */
 object TestFixtures {
-
-    // ========== Songs ==========
 
     fun createTestSong(
         title: String = "Test Song",
@@ -48,8 +43,6 @@ object TestFixtures {
             )
         }
 
-    // ========== Embeddings ==========
-
     fun createNormalizedEmbedding(dim: Int = 128, seed: Int = 42): FloatArray {
         val embedding = FloatArray(dim) { (it + seed) * 0.01f }
         return normalizeVector(embedding)
@@ -61,8 +54,6 @@ object TestFixtures {
         val embedding = FloatArray(dim) { kotlin.random.Random.nextFloat() }
         return normalizeVector(embedding)
     }
-
-    // ========== Sensor Data ==========
 
     fun createStationarySensorData(
         lightLux: Float = 100f,
@@ -101,8 +92,6 @@ object TestFixtures {
         hourOfDay = 18
     )
 
-    // ========== Audio Features ==========
-
     fun createTestAudioFeatures(
         id: String = "test_track",
         danceability: Float = 0.5f,
@@ -114,7 +103,7 @@ object TestFixtures {
         valence: Float = 0.5f,
         tempo: Float = 120f,
         loudness: Float = -5f,
-        duration_ms: Float = 200000f
+        durationMs: Float = 200000f
     ) = AudioFeatures(
         id = id,
         danceability = danceability,
@@ -128,7 +117,7 @@ object TestFixtures {
         liveness = liveness,
         valence = valence,
         tempo = tempo,
-        duration_ms = duration_ms
+        durationMs = durationMs
     )
 
     fun createCalmAudioFeatures() = createTestAudioFeatures(
@@ -151,8 +140,6 @@ object TestFixtures {
         loudness = -3f
     )
 
-    // ========== Test Bitmaps (for Vision Encoding) ==========
-
     /**
      * Creates a test bitmap for vision encoding tests.
      * Note: In unit tests, use mocked Bitmap. In instrumented tests, use real Bitmap.
@@ -161,8 +148,6 @@ object TestFixtures {
         width: Int = 224,
         height: Int = 224
     ) = Triple(width, height, Bitmap.Config.ARGB_8888)
-
-    // ========== Utilities ==========
 
     private fun normalizeVector(vec: FloatArray): FloatArray {
         var sumSquares = 0f

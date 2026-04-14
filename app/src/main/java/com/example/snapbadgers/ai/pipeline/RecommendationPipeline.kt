@@ -25,7 +25,6 @@ class RecommendationPipeline(
     context: Context,
     private val songRepository: SongRepository = SongRepository(context)
 ) : AutoCloseable {
-    private val TAG = "RecommendationPipeline"
     private val appContext = context.applicationContext
     private val useHeuristicTextEncoder = !songRepository.hasEmbeddedCatalog
 
@@ -153,6 +152,7 @@ class RecommendationPipeline(
     }
 
     private companion object {
+        const val TAG = "RecommendationPipeline"
         const val RECOMMENDATION_LIMIT = 3
     }
 

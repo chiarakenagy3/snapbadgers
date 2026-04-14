@@ -15,7 +15,7 @@ class SongEmbeddingUtilsTest {
     ) = AudioFeatures(
         id = "track-1", danceability = 0.7f, energy = 0.6f, speechiness = 0.04f,
         acousticness = 0.2f, instrumentalness = 0.1f, liveness = 0.3f, valence = 0.8f,
-        tempo = tempo, loudness = loudness, key = 5, mode = 1, duration_ms = durationMs
+        tempo = tempo, loudness = loudness, key = 5, mode = 1, durationMs = durationMs
     )
 
     @Test

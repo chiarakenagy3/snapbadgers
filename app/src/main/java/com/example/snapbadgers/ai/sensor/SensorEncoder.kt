@@ -15,8 +15,6 @@ import java.util.LinkedList
 /**
  * SensorEncoder
  *
- * Top-level class for SCRUM-6.
- *
  * Responsibilities:
  *  1. Reads live sensor data from Android (accelerometer, light, GPS, system clock)
  *  2. Maintains a rolling window of accelerometer readings for statistical feature extraction
@@ -40,14 +38,12 @@ class SensorEncoder(private val context: Context) {
     private var latestLat: Double = 0.0
     private var latestLon: Double = 0.0
 
-    // Accelerometer rolling window — keeps last WINDOW_SIZE readings of [x, y, z]
-    // ~20 samples at SENSOR_DELAY_NORMAL ≈ 5 seconds of motion context
-    private val WINDOW_SIZE = 20
+    // Rolling window of accelerometer readings: ~20 samples at SENSOR_DELAY_NORMAL ≈ 5 s
     private val accelWindow = LinkedList<FloatArray>()
 
-    // ------------------------------------------------------------------
-    // Public API
-    // ------------------------------------------------------------------
+    private companion object {
+        const val WINDOW_SIZE = 20
+    }
 
     /** Start collecting sensor data. Call in onResume() or when app is active. */
     fun start() {
@@ -87,10 +83,6 @@ class SensorEncoder(private val context: Context) {
     fun getCurrentFeatures(): FloatArray =
         SensorFeatureExtractor.extract(buildSensorData())
 
-    // ------------------------------------------------------------------
-    // Internal snapshot builder
-    // ------------------------------------------------------------------
-
     private fun buildSensorData(): SensorData = SensorData(
         accelWindow = synchronized(accelWindow) { accelWindow.map { it.copyOf() } },
         lightLux    = latestLux,
@@ -98,10 +90,6 @@ class SensorEncoder(private val context: Context) {
         latitude    = latestLat,
         longitude   = latestLon
     )
-
-    // ------------------------------------------------------------------
-    // Accelerometer
-    // ------------------------------------------------------------------
 
     private val accelListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -125,13 +113,7 @@ class SensorEncoder(private val context: Context) {
                 SensorManager.SENSOR_DELAY_NORMAL
             )
         }
-        // If no accelerometer, accelWindow stays empty — SensorFeatureExtractor
-        // defaults to gravity-level still readings gracefully
     }
-
-    // ------------------------------------------------------------------
-    // Light sensor
-    // ------------------------------------------------------------------
 
     private val lightListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -151,12 +133,7 @@ class SensorEncoder(private val context: Context) {
                 SensorManager.SENSOR_DELAY_NORMAL
             )
         }
-        // If no light sensor, latestLux stays 0 — MLP handles gracefully
     }
-
-    // ------------------------------------------------------------------
-    // GPS / Location
-    // ------------------------------------------------------------------
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {

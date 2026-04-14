@@ -1,5 +1,8 @@
 package com.example.snapbadgers.ai.sensor
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -40,10 +43,10 @@ object SensorFeatureExtractor {
         if (magnitudes.isEmpty()) {
             // No accelerometer data — default to gravity-level still reading
             val gravityNorm = (9.8f / MAX_ACCEL).coerceIn(0f, 1f)
-            features[0] = gravityNorm  // mean
-            features[1] = 0f           // variance
-            features[2] = gravityNorm  // rms
-            features[3] = gravityNorm  // peak
+            features[0] = gravityNorm
+            features[1] = 0f
+            features[2] = gravityNorm
+            features[3] = gravityNorm
         } else {
             val mean = magnitudes.average().toFloat()
             val variance = magnitudes.map { (it - mean) * (it - mean) }.average().toFloat()
@@ -67,9 +70,9 @@ object SensorFeatureExtractor {
         }
 
         // --- Time features (cyclic encoding to avoid 23→0 discontinuity) ---
-        val angleRad = (2.0 * Math.PI * data.hourOfDay / 24.0)
-        features[6] = Math.sin(angleRad).toFloat()
-        features[7] = Math.cos(angleRad).toFloat()
+        val angleRad = 2.0 * PI * data.hourOfDay / 24.0
+        features[6] = sin(angleRad).toFloat()
+        features[7] = cos(angleRad).toFloat()
         features[8] = when (data.hourOfDay) {
             in 0..5   -> 0.0f   // night
             in 6..11  -> 0.33f  // morning
