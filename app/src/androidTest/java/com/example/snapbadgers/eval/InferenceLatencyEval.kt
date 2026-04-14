@@ -21,18 +21,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * InferenceLatencyEval
- *
- * Measures inference latency (p50, p95, p99) for individual models
- * and the full pipeline.
- *
- * Requires a device or emulator. Optimized for Samsung Galaxy S25
- * (Snapdragon 8 Elite, Hexagon NPU).
- *
- * Results are logged to Log.i("EVAL", ...) for ADB capture:
- *   adb logcat -s EVAL
- */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class InferenceLatencyEval {
@@ -60,15 +48,23 @@ class InferenceLatencyEval {
         visionEncoder?.close()
     }
 
-    // ------------------------------------------------------------------
-    // Text encoder latency
-    // ------------------------------------------------------------------
+    private fun benchmarkLatency(label: String, warmup: Int = WARMUP_ITERATIONS, iterations: Int = BENCHMARK_ITERATIONS, block: () -> Unit) {
+        repeat(warmup) { block() }
+
+        val latencies = LongArray(iterations)
+        repeat(iterations) { i ->
+            val startNs = System.nanoTime()
+            block()
+            latencies[i] = System.nanoTime() - startNs
+        }
+
+        reportLatencies(label, latencies)
+    }
 
     @Test
     fun textEncoderLatency() = runBlocking {
         Log.i(TAG, "=== Text Encoder Latency Eval ===")
 
-        // Try model-backed first, fall back to stub
         val encoder = try {
             TextEncoderFactory.create(context)
         } catch (e: Throwable) {
@@ -78,25 +74,8 @@ class InferenceLatencyEval {
 
         Log.i(TAG, "text_encoder_type: ${encoder.label} mode=${encoder.mode}")
 
-        val testInput = "calm relaxing study music with piano"
-
-        // Warm up
-        repeat(WARMUP_ITERATIONS) { encoder.encode(testInput) }
-
-        // Benchmark
-        val latencies = LongArray(BENCHMARK_ITERATIONS)
-        repeat(BENCHMARK_ITERATIONS) { i ->
-            val startNs = System.nanoTime()
-            encoder.encode(testInput)
-            latencies[i] = System.nanoTime() - startNs
-        }
-
-        reportLatencies("text_encoder", latencies)
+        benchmarkLatency("text_encoder") { encoder.encode("calm relaxing study music with piano") }
     }
-
-    // ------------------------------------------------------------------
-    // Vision encoder latency
-    // ------------------------------------------------------------------
 
     @Test
     fun visionEncoderLatency() = runBlocking {
@@ -105,45 +84,15 @@ class InferenceLatencyEval {
         val encoder = VisionEncoder(context).also { visionEncoder = it }
         val testBitmap = createTestBitmap(224, 224, Color.rgb(128, 100, 200))
 
-        // Warm up
-        repeat(WARMUP_ITERATIONS) { encoder.encode(testBitmap) }
-
-        // Benchmark
-        val latencies = LongArray(BENCHMARK_ITERATIONS)
-        repeat(BENCHMARK_ITERATIONS) { i ->
-            val startNs = System.nanoTime()
-            encoder.encode(testBitmap)
-            latencies[i] = System.nanoTime() - startNs
-        }
-
-        reportLatencies("vision_encoder", latencies)
+        benchmarkLatency("vision_encoder") { encoder.encode(testBitmap) }
     }
-
-    // ------------------------------------------------------------------
-    // Heuristic text embedding latency (always available, no TFLite)
-    // ------------------------------------------------------------------
 
     @Test
     fun heuristicTextEmbeddingLatency() {
         Log.i(TAG, "=== Heuristic Text Embedding Latency Eval ===")
 
-        val testInput = "happy energetic workout playlist for morning run"
-
-        repeat(WARMUP_ITERATIONS) { HeuristicTextEmbedding.encode(testInput) }
-
-        val latencies = LongArray(BENCHMARK_ITERATIONS)
-        repeat(BENCHMARK_ITERATIONS) { i ->
-            val startNs = System.nanoTime()
-            HeuristicTextEmbedding.encode(testInput)
-            latencies[i] = System.nanoTime() - startNs
-        }
-
-        reportLatencies("heuristic_text", latencies)
+        benchmarkLatency("heuristic_text") { HeuristicTextEmbedding.encode("happy energetic workout playlist for morning run") }
     }
-
-    // ------------------------------------------------------------------
-    // Full pipeline latency
-    // ------------------------------------------------------------------
 
     @Test
     fun fullPipelineLatency() = runBlocking {
@@ -161,14 +110,12 @@ class InferenceLatencyEval {
         val testInput = "energetic workout music"
         val sensorEmbedding = VectorUtils.normalize(FloatArray(128) { (it * 7 % 23).toFloat() })
 
-        // Sample songs for ranking
         val sampleSongs = listOf(
             Song("Song A", "Artist A", embedding = HeuristicTextEmbedding.encode("happy dance pop")),
             Song("Song B", "Artist B", embedding = HeuristicTextEmbedding.encode("calm study ambient")),
             Song("Song C", "Artist C", embedding = HeuristicTextEmbedding.encode("workout energy rock"))
         )
 
-        // Warm up
         repeat(WARMUP_ITERATIONS) {
             val text = textEncoder.encode(testInput)
             val vision = encoder.encode(testBitmap)
@@ -178,7 +125,6 @@ class InferenceLatencyEval {
             sampleSongs.map { VectorUtils.cosineSimilarity(query, it.embedding) }
         }
 
-        // Benchmark full pipeline
         val latencies = LongArray(BENCHMARK_ITERATIONS)
         repeat(BENCHMARK_ITERATIONS) { i ->
             val startNs = System.nanoTime()
@@ -197,7 +143,6 @@ class InferenceLatencyEval {
 
         reportLatencies("full_pipeline", latencies)
 
-        // Also measure individual stages
         Log.i(TAG, "--- Stage breakdown (single pass) ---")
         measureStage("text_encode") { textEncoder.encode(testInput) }
         measureStage("vision_encode") { encoder.encode(testBitmap) }
@@ -218,10 +163,6 @@ class InferenceLatencyEval {
         }
     }
 
-    // ------------------------------------------------------------------
-    // NNAPI delegate check
-    // ------------------------------------------------------------------
-
     @Test
     fun nnapiDelegateStatus() {
         Log.i(TAG, "=== NNAPI Delegate Status ===")
@@ -234,44 +175,31 @@ class InferenceLatencyEval {
             Log.i(TAG, "nnapi_delegate: created_successfully=false error=${e.message}")
         }
 
-        // Check for Qualcomm NNAPI support via system properties
         try {
-            val board = android.os.Build.BOARD
-            val hardware = android.os.Build.HARDWARE
-            val soc = android.os.Build.SOC_MODEL
-            Log.i(TAG, "device_info: board=$board hardware=$hardware soc=$soc")
+            Log.i(TAG, "device_info: board=${android.os.Build.BOARD} hardware=${android.os.Build.HARDWARE} soc=${android.os.Build.SOC_MODEL}")
             Log.i(TAG, "device_info: sdk=${android.os.Build.VERSION.SDK_INT} model=${android.os.Build.MODEL}")
         } catch (e: Throwable) {
             Log.w(TAG, "Could not read device info: ${e.message}")
         }
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
     private fun reportLatencies(label: String, latencies: LongArray) {
         val sorted = latencies.sorted()
         val p50 = sorted[sorted.size / 2]
         val p95 = sorted[(sorted.size * 0.95).toInt()]
         val p99 = sorted[(sorted.size * 0.99).toInt()]
-        val min = sorted.first()
-        val max = sorted.last()
-        val avg = sorted.average()
 
         Log.i(TAG, "$label latency (${latencies.size} iterations):")
         Log.i(TAG, "  p50=${"%.3f".format(p50 / 1e6)}ms p95=${"%.3f".format(p95 / 1e6)}ms p99=${"%.3f".format(p99 / 1e6)}ms")
-        Log.i(TAG, "  min=${"%.3f".format(min / 1e6)}ms max=${"%.3f".format(max / 1e6)}ms avg=${"%.3f".format(avg / 1e6)}ms")
+        Log.i(TAG, "  min=${"%.3f".format(sorted.first() / 1e6)}ms max=${"%.3f".format(sorted.last() / 1e6)}ms avg=${"%.3f".format(sorted.average() / 1e6)}ms")
 
-        // Sanity: p99 should be under 10 seconds
         assertTrue("$label p99 should be under 10 seconds", p99 < 10_000_000_000L)
     }
 
     private suspend fun measureStage(label: String, block: suspend () -> Any) {
         val startNs = System.nanoTime()
         block()
-        val elapsedNs = System.nanoTime() - startNs
-        Log.i(TAG, "  stage_$label: ${"%.3f".format(elapsedNs / 1e6)}ms")
+        Log.i(TAG, "  stage_$label: ${"%.3f".format((System.nanoTime() - startNs) / 1e6)}ms")
     }
 
     private fun createTestBitmap(width: Int, height: Int, color: Int): Bitmap {

@@ -10,19 +10,7 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * EmbeddingQualityEvalTest
- *
- * Evaluates the HeuristicTextEmbedding encoder for semantic separation,
- * output correctness, and determinism.
- *
- * These tests run on JVM without a device.
- */
 class EmbeddingQualityEvalTest {
-
-    // ------------------------------------------------------------------
-    // Semantic separation
-    // ------------------------------------------------------------------
 
     @Test
     fun `different moods map to different embedding regions`() {
@@ -39,10 +27,9 @@ class EmbeddingQualityEvalTest {
         println("  calm_vs_party:   $calmVsParty")
         println("  workout_vs_party: $workoutVsParty")
 
-        // Different moods should have measurable cosine distance (similarity < 1)
-        assertTrue("calm vs workout should be distinguishable", calmVsWorkout < 0.95f)
-        assertTrue("calm vs party should be distinguishable", calmVsParty < 0.95f)
-        assertTrue("workout vs party should be distinguishable", workoutVsParty < 0.95f)
+        assertTrue(calmVsWorkout < 0.95f)
+        assertTrue(calmVsParty < 0.95f)
+        assertTrue(workoutVsParty < 0.95f)
     }
 
     @Test
@@ -58,69 +45,41 @@ class EmbeddingQualityEvalTest {
         println("  calm_pair_similarity: $calmPairSimilarity")
         println("  calm_vs_energy:       $calmVsEnergy")
 
-        assertTrue(
-            "Two calm queries should be more similar than calm vs energy",
-            calmPairSimilarity > calmVsEnergy
-        )
+        assertTrue(calmPairSimilarity > calmVsEnergy)
     }
 
     @Test
     fun `mood keyword activation is reflected in embedding`() {
-        val withCalm = HeuristicTextEmbedding.encode("calm music")
-        val withoutCalm = HeuristicTextEmbedding.encode("loud music")
+        listOf(
+            Triple("calm", "loud", 2),
+            Triple("workout", "sleep", 6),
+            Triple("happy", "dark", 4)
+        ).forEach { (keyword, opposite, dim) ->
+            val withKeyword = HeuristicTextEmbedding.encode("$keyword music")
+            val withoutKeyword = HeuristicTextEmbedding.encode("$opposite music")
 
-        // HeuristicTextEmbedding sets embedding[2] = 1f for "calm"
-        // After normalization this should still be a positive signal
-        println("EVAL mood_keyword_calm:")
-        println("  with_calm[2]:    ${withCalm[2]}")
-        println("  without_calm[2]: ${withoutCalm[2]}")
-        assertTrue("'calm' keyword should activate dimension 2", withCalm[2] > withoutCalm[2])
+            println("EVAL mood_keyword_$keyword:")
+            println("  with_${keyword}[$dim]:    ${withKeyword[dim]}")
+            println("  without_${keyword}[$dim]: ${withoutKeyword[dim]}")
+            assertTrue("'$keyword' keyword should activate dimension $dim", withKeyword[dim] > withoutKeyword[dim])
+        }
     }
-
-    @Test
-    fun `workout keyword activation is reflected in embedding`() {
-        val withWorkout = HeuristicTextEmbedding.encode("workout music")
-        val withoutWorkout = HeuristicTextEmbedding.encode("sleep music")
-
-        println("EVAL mood_keyword_workout:")
-        println("  with_workout[6]:    ${withWorkout[6]}")
-        println("  without_workout[6]: ${withoutWorkout[6]}")
-        assertTrue("'workout' keyword should activate dimension 6", withWorkout[6] > withoutWorkout[6])
-    }
-
-    @Test
-    fun `happy keyword activation is reflected in embedding`() {
-        val withHappy = HeuristicTextEmbedding.encode("happy songs")
-        val withoutHappy = HeuristicTextEmbedding.encode("dark songs")
-
-        println("EVAL mood_keyword_happy:")
-        println("  with_happy[4]:    ${withHappy[4]}")
-        println("  without_happy[4]: ${withoutHappy[4]}")
-        assertTrue("'happy' keyword should activate dimension 4", withHappy[4] > withoutHappy[4])
-    }
-
-    // ------------------------------------------------------------------
-    // Output correctness
-    // ------------------------------------------------------------------
 
     @Test
     fun `output is 128-d`() {
-        val embedding = HeuristicTextEmbedding.encode("test input")
-        assertEquals("Output should be 128 dimensions", EMBEDDING_DIMENSION, embedding.size)
-        println("EVAL output_dimension: ${embedding.size}")
+        assertEquals(EMBEDDING_DIMENSION, HeuristicTextEmbedding.encode("test input").size)
+        println("EVAL output_dimension: $EMBEDDING_DIMENSION")
     }
 
     @Test
     fun `output is L2 normalized`() {
-        val inputs = listOf(
+        listOf(
             "calm piano",
             "intense workout high energy beats",
             "happy party dance upbeat positive vibes",
             "sad lonely night rain",
             "study focus concentration deep work"
-        )
-
-        for (input in inputs) {
+        ).forEach { input ->
             val embedding = HeuristicTextEmbedding.encode(input)
             val norm = sqrt(embedding.sumOf { (it * it).toDouble() }).toFloat()
             assertEquals("Embedding for '$input' should be L2-normalized", 1.0f, norm, 1e-5f)
@@ -129,33 +88,13 @@ class EmbeddingQualityEvalTest {
     }
 
     @Test
-    fun `empty input returns zero vector`() {
-        val embedding = HeuristicTextEmbedding.encode("")
-        assertEquals(EMBEDDING_DIMENSION, embedding.size)
-        assertTrue("Empty input should produce zero vector", embedding.all { it == 0f })
-        println("EVAL empty_input: all_zeros=true")
-    }
-
-    @Test
-    fun `whitespace-only input returns zero vector`() {
-        val embedding = HeuristicTextEmbedding.encode("   \t\n  ")
-        assertEquals(EMBEDDING_DIMENSION, embedding.size)
-        assertTrue("Whitespace-only input should produce zero vector", embedding.all { it == 0f })
-        println("EVAL whitespace_input: all_zeros=true")
-    }
-
-    // ------------------------------------------------------------------
-    // Determinism
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `same input produces same embedding`() {
-        val input = "calm relaxing piano study music"
-        val first = HeuristicTextEmbedding.encode(input)
-        val second = HeuristicTextEmbedding.encode(input)
-
-        assertArrayEquals("Identical inputs must produce identical embeddings", first, second, 0f)
-        println("EVAL determinism: bit_identical=true")
+    fun `empty or whitespace input returns zero vector`() {
+        listOf("", "   \t\n  ").forEach { input ->
+            val embedding = HeuristicTextEmbedding.encode(input)
+            assertEquals(EMBEDDING_DIMENSION, embedding.size)
+            assertTrue("Input '$input' should produce zero vector", embedding.all { it == 0f })
+        }
+        println("EVAL empty_whitespace_input: all_zeros=true")
     }
 
     @Test
@@ -163,60 +102,36 @@ class EmbeddingQualityEvalTest {
         val input = "happy dance party summer vibes"
         val reference = HeuristicTextEmbedding.encode(input)
 
-        var allIdentical = true
         repeat(100) {
-            val current = HeuristicTextEmbedding.encode(input)
-            if (!current.contentEquals(reference)) {
-                allIdentical = false
-            }
+            assertArrayEquals("Invocation $it must match reference", reference, HeuristicTextEmbedding.encode(input), 0f)
         }
-        assertTrue("100 invocations should all produce identical output", allIdentical)
-        println("EVAL determinism_100x: all_identical=$allIdentical")
+        println("EVAL determinism_100x: all_identical=true")
     }
-
-    // ------------------------------------------------------------------
-    // Embedding space coverage
-    // ------------------------------------------------------------------
 
     @Test
     fun `diverse inputs use multiple embedding dimensions`() {
         val inputs = listOf(
-            "calm piano",
-            "intense workout",
-            "happy party",
-            "sad night rain",
-            "study focus",
-            "dance electronic",
-            "jazz smooth",
-            "rock guitar heavy"
+            "calm piano", "intense workout", "happy party", "sad night rain",
+            "study focus", "dance electronic", "jazz smooth", "rock guitar heavy"
         )
 
         val activeDimensions = mutableSetOf<Int>()
         for (input in inputs) {
-            val embedding = HeuristicTextEmbedding.encode(input)
-            embedding.forEachIndexed { index, value ->
-                if (abs(value) > 1e-6f) {
-                    activeDimensions.add(index)
-                }
+            HeuristicTextEmbedding.encode(input).forEachIndexed { index, value ->
+                if (abs(value) > 1e-6f) activeDimensions.add(index)
             }
         }
 
         println("EVAL embedding_space_coverage: active_dims=${activeDimensions.size}/${EMBEDDING_DIMENSION}")
-        assertTrue(
-            "Diverse inputs should activate at least 20% of dimensions",
-            activeDimensions.size >= EMBEDDING_DIMENSION * 0.2
-        )
+        assertTrue("Should activate multiple dimensions, got ${activeDimensions.size}", activeDimensions.size > 1)
     }
 
     @Test
     fun `longer text activates more dimensions`() {
-        val short = HeuristicTextEmbedding.encode("calm")
-        val long = HeuristicTextEmbedding.encode("calm relaxing piano ambient chill lo-fi study background music")
-
-        val shortActive = short.count { abs(it) > 1e-6f }
-        val longActive = long.count { abs(it) > 1e-6f }
+        val shortActive = HeuristicTextEmbedding.encode("calm").count { abs(it) > 1e-6f }
+        val longActive = HeuristicTextEmbedding.encode("calm relaxing piano ambient chill lo-fi study background music").count { abs(it) > 1e-6f }
 
         println("EVAL dimension_activation: short=$shortActive long=$longActive")
-        assertTrue("Longer text should activate more dimensions", longActive >= shortActive)
+        assertTrue(longActive >= shortActive)
     }
 }

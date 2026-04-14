@@ -12,14 +12,6 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * FusionEngineEvalTest
- *
- * Evaluates the FusionEngine for single/multi-modality fusion behavior,
- * weight balance, zero-vector handling, and consistency.
- *
- * These tests run on JVM without a device.
- */
 class FusionEngineEvalTest {
 
     private lateinit var fusionEngine: FusionEngine
@@ -29,53 +21,23 @@ class FusionEngineEvalTest {
         fusionEngine = FusionEngine()
     }
 
-    // ------------------------------------------------------------------
-    // Single-modality fusion
-    // ------------------------------------------------------------------
-
     @Test
-    fun `text-only fusion produces valid output`() {
+    fun `text-only fusion produces valid output and matches text-aligned path`() {
         val textEmbedding = HeuristicTextEmbedding.encode("calm relaxing piano")
-        val fused = fusionEngine.fuse(
-            textEmbedding = textEmbedding,
-            visionEmbedding = null,
-            sensorEmbedding = null
-        )
+        val fused = fusionEngine.fuse(textEmbedding = textEmbedding, visionEmbedding = null, sensorEmbedding = null)
 
-        assertEquals("Fused output should be $EMBEDDING_DIMENSION-d", EMBEDDING_DIMENSION, fused.size)
+        assertEquals(EMBEDDING_DIMENSION, fused.size)
         val norm = sqrt(fused.sumOf { (it * it).toDouble() }).toFloat()
-        assertEquals("Fused output should be L2-normalized", 1.0f, norm, 1e-4f)
-        assertTrue("Text-only fusion should produce non-zero output", fused.any { abs(it) > 1e-6f })
-
+        assertEquals(1.0f, norm, 1e-4f)
+        assertTrue(fused.any { abs(it) > 1e-6f })
         println("EVAL text_only_fusion: norm=$norm nonzero_dims=${fused.count { abs(it) > 1e-6f }}")
-    }
 
-    @Test
-    fun `null vision and sensor produces text-dominated output`() {
-        val textEmbedding = HeuristicTextEmbedding.encode("happy dance party")
-        val textOnly = fusionEngine.fuse(
-            textEmbedding = textEmbedding,
-            visionEmbedding = null,
-            sensorEmbedding = null
-        )
-
-        // With only text, the fused output should be entirely derived from text
-        // (aligned and normalized). Verify it correlates strongly with raw text alignment.
+        // With only text, fused output should match text alignment path exactly
         val textAligned = VectorUtils.alignToEmbeddingDimension(textEmbedding, salt = 11)
-        val similarity = VectorUtils.cosineSimilarity(textOnly, textAligned)
-
+        val similarity = VectorUtils.cosineSimilarity(fused, textAligned)
         println("EVAL text_dominated: text_alignment_similarity=$similarity")
-        // When only text is provided, the fused output should be identical to the
-        // text modality path (aligned, weighted, then re-normalized)
-        assertEquals(
-            "Text-only fusion should match text-aligned output",
-            1.0f, similarity, 1e-4f
-        )
+        assertEquals(1.0f, similarity, 1e-4f)
     }
-
-    // ------------------------------------------------------------------
-    // Multi-modality weight balance
-    // ------------------------------------------------------------------
 
     @Test
     fun `multi-modality fusion uses all three modalities`() {
@@ -83,28 +45,22 @@ class FusionEngineEvalTest {
         val vision = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { (it * 3 % 17).toFloat() })
         val sensor = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { (it * 7 % 23).toFloat() })
 
-        val fullFusion = fusionEngine.fuse(text, vision, sensor)
-        val textOnlyFusion = fusionEngine.fuse(text, null, null)
-
-        val similarity = VectorUtils.cosineSimilarity(fullFusion, textOnlyFusion)
-        println("EVAL multi_vs_text_only: similarity=$similarity")
-        assertTrue(
-            "Full fusion should differ from text-only fusion",
-            similarity < 0.999f
+        val similarity = VectorUtils.cosineSimilarity(
+            fusionEngine.fuse(text, vision, sensor),
+            fusionEngine.fuse(text, null, null)
         )
+        println("EVAL multi_vs_text_only: similarity=$similarity")
+        assertTrue(similarity < 0.999f)
     }
 
     @Test
     fun `weight balance 60-25-15 is reflected in relative influence`() {
-        // Create orthogonal-ish modality embeddings
         val text = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { if (it < 43) 1f else 0f })
         val vision = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { if (it in 43..85) 1f else 0f })
         val sensor = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { if (it > 85) 1f else 0f })
 
         val fused = fusionEngine.fuse(text, vision, sensor)
 
-        // With default weights (vision=0.60, text=0.25, sensor=0.15), vision should
-        // have the strongest influence. We measure by checking correlation with each modality.
         val textAligned = VectorUtils.alignToEmbeddingDimension(text, salt = 11)
         val visionAligned = VectorUtils.alignToEmbeddingDimension(vision, salt = 19)
         val sensorAligned = VectorUtils.alignToEmbeddingDimension(sensor, salt = 23)
@@ -118,81 +74,41 @@ class FusionEngineEvalTest {
         println("  fused_vs_vision: $fusedVsVision (weight=0.60)")
         println("  fused_vs_sensor: $fusedVsSensor (weight=0.15)")
 
-        // Vision (0.60) should have the largest influence
-        assertTrue(
-            "Vision (0.60) should have more influence than text (0.25)",
-            fusedVsVision > fusedVsText
-        )
-        assertTrue(
-            "Vision (0.60) should have more influence than sensor (0.15)",
-            fusedVsVision > fusedVsSensor
-        )
+        assertTrue(fusedVsVision > fusedVsText)
+        assertTrue(fusedVsVision > fusedVsSensor)
     }
 
     @Test
     fun `custom weights override default balance`() {
-        val customEngine = FusionEngine(
-            visionWeight = 0.10f,
-            textWeight = 0.80f,
-            sensorWeight = 0.10f
-        )
-
+        val customEngine = FusionEngine(visionWeight = 0.10f, textWeight = 0.80f, sensorWeight = 0.10f)
         val text = HeuristicTextEmbedding.encode("calm study music")
         val vision = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { (it * 3).toFloat() })
         val sensor = VectorUtils.normalize(FloatArray(EMBEDDING_DIMENSION) { (it * 7).toFloat() })
 
-        val defaultFused = fusionEngine.fuse(text, vision, sensor)
-        val customFused = customEngine.fuse(text, vision, sensor)
-
-        val similarity = VectorUtils.cosineSimilarity(defaultFused, customFused)
+        val similarity = VectorUtils.cosineSimilarity(
+            fusionEngine.fuse(text, vision, sensor),
+            customEngine.fuse(text, vision, sensor)
+        )
         println("EVAL custom_weights: default_vs_custom_similarity=$similarity")
-        assertTrue("Custom weights should produce different fusion result", similarity < 0.999f)
-    }
-
-    // ------------------------------------------------------------------
-    // Zero vector handling
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `fusion with zero sensor does not produce NaN`() {
-        val text = HeuristicTextEmbedding.encode("test music")
-        val zeroSensor = FloatArray(128) { 0f }
-
-        val fused = fusionEngine.fuse(text, null, zeroSensor)
-
-        assertTrue("No NaN in fused output", fused.none { it.isNaN() })
-        assertTrue("No Inf in fused output", fused.none { it.isInfinite() })
-        println("EVAL zero_sensor: has_nan=false has_inf=false")
+        assertTrue(similarity < 0.999f)
     }
 
     @Test
-    fun `fusion with zero vision does not produce NaN`() {
-        val text = HeuristicTextEmbedding.encode("test music")
-        val zeroVision = FloatArray(64) { 0f }
+    fun `fusion with zero inputs does not produce NaN`() {
+        listOf(
+            Triple("zero_sensor", HeuristicTextEmbedding.encode("test music"), Triple<FloatArray?, FloatArray?, Boolean>(null, FloatArray(128) { 0f }, false)),
+            Triple("zero_vision", HeuristicTextEmbedding.encode("test music"), Triple<FloatArray?, FloatArray?, Boolean>(FloatArray(64) { 0f }, null, false)),
+            Triple("all_zeros", FloatArray(128) { 0f }, Triple<FloatArray?, FloatArray?, Boolean>(FloatArray(128) { 0f }, FloatArray(128) { 0f }, true))
+        ).forEach { (label, text, modalities) ->
+            val (vision, sensor, expectZero) = modalities
+            val fused = fusionEngine.fuse(text, vision, sensor)
 
-        val fused = fusionEngine.fuse(text, zeroVision, null)
-
-        assertTrue("No NaN in fused output", fused.none { it.isNaN() })
-        assertTrue("No Inf in fused output", fused.none { it.isInfinite() })
-        println("EVAL zero_vision: has_nan=false has_inf=false")
+            assertTrue("No NaN in $label", fused.none { it.isNaN() })
+            assertTrue("No Inf in $label", fused.none { it.isInfinite() })
+            if (expectZero) assertTrue("$label should produce zero output", fused.all { abs(it) < 1e-6f })
+            println("EVAL $label: has_nan=false has_inf=false${if (expectZero) " is_zero_vector=true" else ""}")
+        }
     }
-
-    @Test
-    fun `fusion with all zero inputs produces zero vector`() {
-        val zeroText = FloatArray(128) { 0f }
-        val zeroVision = FloatArray(128) { 0f }
-        val zeroSensor = FloatArray(128) { 0f }
-
-        val fused = fusionEngine.fuse(zeroText, zeroVision, zeroSensor)
-
-        assertTrue("No NaN in fused output", fused.none { it.isNaN() })
-        assertTrue("All-zero inputs should produce zero output", fused.all { abs(it) < 1e-6f })
-        println("EVAL all_zeros: is_zero_vector=true")
-    }
-
-    // ------------------------------------------------------------------
-    // Consistency
-    // ------------------------------------------------------------------
 
     @Test
     fun `100 fusions with same input produce identical output`() {
@@ -201,58 +117,36 @@ class FusionEngineEvalTest {
         val sensor = VectorUtils.normalize(FloatArray(32) { (it * 3 % 7).toFloat() })
 
         val reference = fusionEngine.fuse(text, vision, sensor)
-        var allIdentical = true
-
         repeat(100) {
-            val current = fusionEngine.fuse(text, vision, sensor)
-            if (!current.contentEquals(reference)) {
-                allIdentical = false
-            }
+            assertTrue(fusionEngine.fuse(text, vision, sensor).contentEquals(reference))
         }
-
-        assertTrue("100 fusions with identical input should produce identical output", allIdentical)
-        println("EVAL consistency_100x: all_identical=$allIdentical")
+        println("EVAL consistency_100x: all_identical=true")
     }
 
     @Test
     fun `fusion output dimension is always 128`() {
-        val cases = listOf(
+        listOf(
             Triple(FloatArray(10) { 1f }, null, null),
             Triple(FloatArray(128) { 1f }, FloatArray(64) { 1f }, null),
             Triple(FloatArray(128) { 1f }, FloatArray(128) { 1f }, FloatArray(32) { 1f }),
             Triple(FloatArray(5) { 1f }, FloatArray(200) { 1f }, FloatArray(8) { 1f })
-        )
-
-        for ((idx, triple) in cases.withIndex()) {
-            val (text, vision, sensor) = triple
-            val fused = fusionEngine.fuse(text, vision, sensor)
-            assertEquals("Case $idx: output should be $EMBEDDING_DIMENSION-d", EMBEDDING_DIMENSION, fused.size)
+        ).forEachIndexed { idx, (text, vision, sensor) ->
+            assertEquals("Case $idx: output should be $EMBEDDING_DIMENSION-d", EMBEDDING_DIMENSION, fusionEngine.fuse(text, vision, sensor).size)
         }
         println("EVAL output_dimension: all cases produce ${EMBEDDING_DIMENSION}-d output")
     }
 
-    // ------------------------------------------------------------------
-    // Edge cases
-    // ------------------------------------------------------------------
-
     @Test
-    fun `fusion with very small embeddings`() {
-        val tiny = FloatArray(3) { 0.001f }
-        val fused = fusionEngine.fuse(tiny, null, null)
-
-        assertEquals(EMBEDDING_DIMENSION, fused.size)
-        assertTrue("No NaN with tiny input", fused.none { it.isNaN() })
-        println("EVAL tiny_input: dim=${fused.size} has_nan=false")
-    }
-
-    @Test
-    fun `fusion with very large embeddings`() {
-        val large = FloatArray(1000) { 100f }
-        val fused = fusionEngine.fuse(large, null, null)
-
-        assertEquals(EMBEDDING_DIMENSION, fused.size)
-        assertTrue("No NaN with large input", fused.none { it.isNaN() })
-        assertTrue("No Inf with large input", fused.none { it.isInfinite() })
-        println("EVAL large_input: dim=${fused.size} has_nan=false has_inf=false")
+    fun `fusion with very small and very large embeddings`() {
+        listOf(
+            "tiny" to FloatArray(3) { 0.001f },
+            "large" to FloatArray(1000) { 100f }
+        ).forEach { (label, input) ->
+            val fused = fusionEngine.fuse(input, null, null)
+            assertEquals(EMBEDDING_DIMENSION, fused.size)
+            assertTrue("No NaN with $label input", fused.none { it.isNaN() })
+            assertTrue("No Inf with $label input", fused.none { it.isInfinite() })
+            println("EVAL ${label}_input: dim=${fused.size} has_nan=false has_inf=false")
+        }
     }
 }

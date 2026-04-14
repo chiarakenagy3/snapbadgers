@@ -21,17 +21,6 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.math.sqrt
 
-/**
- * PipelineCorrectnessEvalTest
- *
- * End-to-end evaluation of the heuristic recommendation path
- * (no TFLite, no Android context, no device).
- *
- * Verifies: text encode -> fuse -> project -> rank against sample songs,
- * plus MLPProjector fallback and full pipeline determinism.
- *
- * These tests run on JVM without a device.
- */
 class PipelineCorrectnessEvalTest {
 
     private lateinit var fusionEngine: FusionEngine
@@ -43,224 +32,96 @@ class PipelineCorrectnessEvalTest {
         fusionEngine = FusionEngine()
         projectionNetwork = ProjectionNetwork()
 
-        // Build sample songs with heuristic embeddings (mirrors SongRepository fallback)
         sampleSongs = listOf(
-            Song(
-                title = "Blinding Lights",
-                artist = "The Weeknd",
-                embedding = HeuristicTextEmbedding.encode(
-                    "Blinding Lights by The Weeknd energetic pop workout night drive upbeat"
-                )
-            ),
-            Song(
-                title = "Sunflower",
-                artist = "Post Malone",
-                embedding = HeuristicTextEmbedding.encode(
-                    "Sunflower by Post Malone happy chill pop easy listening daytime"
-                )
-            ),
-            Song(
-                title = "Weightless",
-                artist = "Marconi Union",
-                embedding = HeuristicTextEmbedding.encode(
-                    "Weightless by Marconi Union calm study relax sleep ambient"
-                )
-            ),
-            Song(
-                title = "Thunderstruck",
-                artist = "AC/DC",
-                embedding = HeuristicTextEmbedding.encode(
-                    "Thunderstruck by AC/DC rock heavy energy intense guitar"
-                )
-            ),
-            Song(
-                title = "Claire de Lune",
-                artist = "Debussy",
-                embedding = HeuristicTextEmbedding.encode(
-                    "Claire de Lune by Debussy calm classical piano night peaceful"
-                )
-            )
+            Song(title = "Blinding Lights", artist = "The Weeknd",
+                embedding = HeuristicTextEmbedding.encode("Blinding Lights by The Weeknd energetic pop workout night drive upbeat")),
+            Song(title = "Sunflower", artist = "Post Malone",
+                embedding = HeuristicTextEmbedding.encode("Sunflower by Post Malone happy chill pop easy listening daytime")),
+            Song(title = "Weightless", artist = "Marconi Union",
+                embedding = HeuristicTextEmbedding.encode("Weightless by Marconi Union calm study relax sleep ambient")),
+            Song(title = "Thunderstruck", artist = "AC/DC",
+                embedding = HeuristicTextEmbedding.encode("Thunderstruck by AC/DC rock heavy energy intense guitar")),
+            Song(title = "Claire de Lune", artist = "Debussy",
+                embedding = HeuristicTextEmbedding.encode("Claire de Lune by Debussy calm classical piano night peaceful"))
         )
     }
 
-    // ------------------------------------------------------------------
-    // End-to-end heuristic path
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `end to end heuristic path produces ranked results with descending similarity`() {
-        // Step 1: Encode text
-        val textEmbedding = HeuristicTextEmbedding.encode("calm relaxing study music")
-
-        // Step 2: Create sensor embedding
-        val sensorData = SensorData(
-            accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
-            lightLux = 200f
-        )
-        val sensorEmbedding = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
-
-        // Step 3: Fuse (no vision)
-        val fusedEmbedding = fusionEngine.fuse(
-            textEmbedding = textEmbedding,
-            visionEmbedding = null,
-            sensorEmbedding = sensorEmbedding
-        )
-
-        // Step 4: Project
+    private fun rankSongs(query: String): List<Song> {
+        val textEmbedding = HeuristicTextEmbedding.encode(query)
+        val fusedEmbedding = fusionEngine.fuse(textEmbedding, null, null)
         val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
-
-        // Step 5: Rank against songs
         val normalizedQuery = VectorUtils.alignToEmbeddingDimension(projectedEmbedding, salt = 101)
-        val rankedSongs = sampleSongs
-            .map { song ->
-                val score = VectorUtils.cosineSimilarity(normalizedQuery, song.embedding)
-                song.copy(similarity = score)
-            }
+        return sampleSongs
+            .map { it.copy(similarity = VectorUtils.cosineSimilarity(normalizedQuery, it.embedding)) }
             .sortedByDescending { it.similarity }
+    }
 
-        // Verify descending similarity
-        for (i in 0 until rankedSongs.size - 1) {
+    private fun assertDescending(ranked: List<Song>) {
+        for (i in 0 until ranked.size - 1) {
             assertTrue(
-                "Song ${i} (${rankedSongs[i].similarity}) >= Song ${i + 1} (${rankedSongs[i + 1].similarity})",
-                rankedSongs[i].similarity >= rankedSongs[i + 1].similarity
+                "Song $i (${ranked[i].similarity}) >= Song ${i + 1} (${ranked[i + 1].similarity})",
+                ranked[i].similarity >= ranked[i + 1].similarity
             )
         }
+    }
 
-        println("EVAL e2e_ranking:")
-        rankedSongs.forEachIndexed { idx, song ->
+    @Test
+    fun `query ranking produces descending similarity`() {
+        listOf(
+            "calm relaxing study music" to "e2e",
+            "intense workout running high energy" to "workout",
+            "calm relaxing sleep ambient peaceful" to "calm"
+        ).forEach { (query, label) ->
+            val ranked = rankSongs(query)
+            assertDescending(ranked)
+            println("EVAL ${label}_query_ranking:")
+            ranked.forEachIndexed { idx, song ->
+                println("  #${idx + 1}: ${song.title} (sim=${"%.4f".format(song.similarity)})")
+            }
+        }
+    }
+
+    @Test
+    fun `end to end with sensor data produces descending similarity`() {
+        val textEmbedding = HeuristicTextEmbedding.encode("calm relaxing study music")
+        val sensorData = SensorData(accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)), lightLux = 200f)
+        val sensorEmbedding = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
+        val fusedEmbedding = fusionEngine.fuse(textEmbedding, null, sensorEmbedding)
+        val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
+        val normalizedQuery = VectorUtils.alignToEmbeddingDimension(projectedEmbedding, salt = 101)
+
+        val ranked = sampleSongs
+            .map { it.copy(similarity = VectorUtils.cosineSimilarity(normalizedQuery, it.embedding)) }
+            .sortedByDescending { it.similarity }
+
+        assertDescending(ranked)
+        println("EVAL e2e_sensor_ranking:")
+        ranked.forEachIndexed { idx, song ->
             println("  #${idx + 1}: ${song.title} by ${song.artist} (sim=${"%.4f".format(song.similarity)})")
         }
     }
 
     @Test
-    fun `workout query ranks energetic songs higher`() {
-        val textEmbedding = HeuristicTextEmbedding.encode("intense workout running high energy")
-        val fusedEmbedding = fusionEngine.fuse(textEmbedding, null, null)
-        val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
-
-        val normalizedQuery = VectorUtils.alignToEmbeddingDimension(projectedEmbedding, salt = 101)
-        val ranked = sampleSongs
-            .map { it.copy(similarity = VectorUtils.cosineSimilarity(normalizedQuery, it.embedding)) }
-            .sortedByDescending { it.similarity }
-
-        println("EVAL workout_query_ranking:")
-        ranked.forEachIndexed { idx, song ->
-            println("  #${idx + 1}: ${song.title} (sim=${"%.4f".format(song.similarity)})")
-        }
-
-        // Verify descending order
-        for (i in 0 until ranked.size - 1) {
-            assertTrue(ranked[i].similarity >= ranked[i + 1].similarity)
-        }
-    }
-
-    @Test
-    fun `calm query ranks calm songs higher`() {
-        val textEmbedding = HeuristicTextEmbedding.encode("calm relaxing sleep ambient peaceful")
-        val fusedEmbedding = fusionEngine.fuse(textEmbedding, null, null)
-        val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
-
-        val normalizedQuery = VectorUtils.alignToEmbeddingDimension(projectedEmbedding, salt = 101)
-        val ranked = sampleSongs
-            .map { it.copy(similarity = VectorUtils.cosineSimilarity(normalizedQuery, it.embedding)) }
-            .sortedByDescending { it.similarity }
-
-        println("EVAL calm_query_ranking:")
-        ranked.forEachIndexed { idx, song ->
-            println("  #${idx + 1}: ${song.title} (sim=${"%.4f".format(song.similarity)})")
-        }
-
-        for (i in 0 until ranked.size - 1) {
-            assertTrue(ranked[i].similarity >= ranked[i + 1].similarity)
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // MLPProjector fallback (songembeddings module)
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `MLPProjector manual fallback produces 128-d output`() {
+    fun `MLPProjector fallback produces 128-d deterministic output`() {
         val audioFeatures = AudioFeatures(
-            id = "test",
-            danceability = 0.7f,
-            energy = 0.6f,
-            speechiness = 0.04f,
-            acousticness = 0.2f,
-            instrumentalness = 0.1f,
-            liveness = 0.3f,
-            valence = 0.8f,
-            tempo = 128f,
-            loudness = -8f,
-            key = 5,
-            mode = 1,
-            duration_ms = 180000f
+            id = "test", danceability = 0.7f, energy = 0.6f, speechiness = 0.04f,
+            acousticness = 0.2f, instrumentalness = 0.1f, liveness = 0.3f, valence = 0.8f,
+            tempo = 128f, loudness = -8f, key = 5, mode = 1, duration_ms = 180000f
         )
 
-        val base = buildBaseVector(audioFeatures)
-        val derived = addDerivedFeatures(base)
-        val combined = base + derived
-        assertEquals("Combined features should be 15-d", 15, combined.size)
+        val combined = buildBaseVector(audioFeatures).let { it + addDerivedFeatures(it) }
+        assertEquals(15, combined.size)
 
-        // MLPProjector.project uses manualProject fallback when no TFLite interpreter
         val embedding = MLPProjector.project(combined)
-        assertEquals("MLPProjector output should be 128-d", 128, embedding.size)
+        assertEquals(128, embedding.size)
+        assertArrayEquals(embedding, MLPProjector.project(combined), 0f)
+
+        val norm = sqrt(normalize(embedding).sumOf { (it * it).toDouble() }).toFloat()
+        assertEquals(1.0f, norm, 1e-4f)
+
         println("EVAL mlp_projector_fallback: dim=${embedding.size}")
-    }
-
-    @Test
-    fun `MLPProjector fallback is deterministic`() {
-        val input = FloatArray(15) { (it + 1).toFloat() / 15f }
-        val first = MLPProjector.project(input)
-        val second = MLPProjector.project(input)
-
-        assertArrayEquals("MLPProjector should be deterministic", first, second, 0f)
         println("EVAL mlp_projector_determinism: identical=true")
-    }
-
-    @Test
-    fun `normalized MLPProjector output is unit length`() {
-        val input = FloatArray(15) { (it + 1).toFloat() / 15f }
-        val embedding = MLPProjector.project(input)
-        val normalized = normalize(embedding)
-        val norm = sqrt(normalized.sumOf { (it * it).toDouble() }).toFloat()
-
-        assertEquals("Normalized MLPProjector output should be unit length", 1.0f, norm, 1e-4f)
         println("EVAL mlp_projector_normalized: norm=$norm")
-    }
-
-    // ------------------------------------------------------------------
-    // Pipeline determinism
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `same pipeline inputs produce same recommendations`() {
-        val input = "happy upbeat dance party"
-        val sensorData = SensorData(
-            accelWindow = listOf(floatArrayOf(1f, 9.8f, -0.5f)),
-            lightLux = 300f
-        )
-        val sensorEncoder = SensorEncoderMLP()
-
-        fun runPipeline(): List<Pair<String, Float>> {
-            val text = HeuristicTextEmbedding.encode(input)
-            val sensor = sensorEncoder.encode(SensorFeatureExtractor.extract(sensorData))
-            val fused = fusionEngine.fuse(text, null, sensor)
-            val projected = projectionNetwork.project(fused)
-            val query = VectorUtils.alignToEmbeddingDimension(projected, salt = 101)
-            return sampleSongs
-                .map { it.title to VectorUtils.cosineSimilarity(query, it.embedding) }
-                .sortedByDescending { it.second }
-        }
-
-        val first = runPipeline()
-        val second = runPipeline()
-
-        assertEquals("Same inputs should produce same ranking order", first.map { it.first }, second.map { it.first })
-        first.zip(second).forEachIndexed { idx, (a, b) ->
-            assertEquals("Song $idx similarity should be identical", a.second, b.second, 0f)
-        }
-        println("EVAL pipeline_determinism: ranking_identical=true scores_identical=true")
     }
 
     @Test
@@ -269,10 +130,7 @@ class PipelineCorrectnessEvalTest {
 
         fun runPipeline(): List<Float> {
             val text = HeuristicTextEmbedding.encode(input)
-            val sensorData = SensorData(
-                accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
-                lightLux = 100f
-            )
+            val sensorData = SensorData(accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)), lightLux = 100f)
             val sensor = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
             val fused = fusionEngine.fuse(text, null, sensor)
             val projected = projectionNetwork.project(fused)
@@ -281,66 +139,36 @@ class PipelineCorrectnessEvalTest {
         }
 
         val reference = runPipeline()
-        var allIdentical = true
         repeat(50) {
             val current = runPipeline()
-            if (reference.zip(current).any { (a, b) -> a != b }) {
-                allIdentical = false
+            reference.zip(current).forEachIndexed { idx, (a, b) ->
+                assertEquals("Run $it song $idx", a, b, 0f)
             }
         }
-
-        assertTrue("50 pipeline runs should produce identical results", allIdentical)
-        println("EVAL pipeline_determinism_50x: all_identical=$allIdentical")
-    }
-
-    // ------------------------------------------------------------------
-    // Intermediate dimension checks
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `each pipeline stage produces correct dimensions`() {
-        val textEmbedding = HeuristicTextEmbedding.encode("test input")
-        assertEquals("Text embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, textEmbedding.size)
-
-        val sensorData = SensorData(
-            accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
-            lightLux = 100f
-        )
-        val sensorEmbedding = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
-        assertEquals("Sensor embedding should be 32-d (MLP output)", 32, sensorEmbedding.size)
-
-        val fused = fusionEngine.fuse(textEmbedding, null, sensorEmbedding)
-        assertEquals("Fused embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, fused.size)
-
-        val projected = projectionNetwork.project(fused)
-        assertEquals("Projected embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, projected.size)
-
-        println("EVAL pipeline_dims: text=${textEmbedding.size} sensor=${sensorEmbedding.size} fused=${fused.size} projected=${projected.size}")
+        println("EVAL pipeline_determinism_50x: all_identical=true")
     }
 
     @Test
-    fun `all pipeline outputs are L2-normalized`() {
+    fun `each pipeline stage produces correct dimensions and L2-normalized output`() {
         val text = HeuristicTextEmbedding.encode("test music")
-        val sensorData = SensorData(
-            accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)),
-            lightLux = 100f
-        )
+        val sensorData = SensorData(accelWindow = listOf(floatArrayOf(0f, 9.8f, 0f)), lightLux = 100f)
         val sensor = SensorEncoderMLP().encode(SensorFeatureExtractor.extract(sensorData))
         val fused = fusionEngine.fuse(text, null, sensor)
         val projected = projectionNetwork.project(fused)
 
         fun norm(v: FloatArray) = sqrt(v.sumOf { (it * it).toDouble() }).toFloat()
 
-        val textNorm = norm(text)
-        val sensorNorm = norm(sensor)
-        val fusedNorm = norm(fused)
-        val projectedNorm = norm(projected)
+        assertEquals(EMBEDDING_DIMENSION, text.size)
+        assertEquals(32, sensor.size)
+        assertEquals(EMBEDDING_DIMENSION, fused.size)
+        assertEquals(EMBEDDING_DIMENSION, projected.size)
 
-        assertEquals("Text embedding norm", 1.0f, textNorm, 1e-4f)
-        assertEquals("Sensor embedding norm", 1.0f, sensorNorm, 1e-4f)
-        assertEquals("Fused embedding norm", 1.0f, fusedNorm, 1e-4f)
-        assertEquals("Projected embedding norm", 1.0f, projectedNorm, 1e-4f)
+        assertEquals(1.0f, norm(text), 1e-4f)
+        assertEquals(1.0f, norm(sensor), 1e-4f)
+        assertEquals(1.0f, norm(fused), 1e-4f)
+        assertEquals(1.0f, norm(projected), 1e-4f)
 
-        println("EVAL pipeline_norms: text=$textNorm sensor=$sensorNorm fused=$fusedNorm projected=$projectedNorm")
+        println("EVAL pipeline_dims: text=${text.size} sensor=${sensor.size} fused=${fused.size} projected=${projected.size}")
+        println("EVAL pipeline_norms: text=${norm(text)} sensor=${norm(sensor)} fused=${norm(fused)} projected=${norm(projected)}")
     }
 }

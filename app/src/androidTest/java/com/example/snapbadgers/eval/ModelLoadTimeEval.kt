@@ -14,18 +14,6 @@ import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
-/**
- * ModelLoadTimeEval
- *
- * Measures model loading time (cold and warm) and memory impact
- * for each TFLite model in the app.
- *
- * Requires a device or emulator. Written for the Samsung Galaxy S25
- * (Snapdragon 8 Elite) but runs on any Android device/emulator.
- *
- * Results are logged to Log.i("EVAL", ...) for ADB capture:
- *   adb logcat -s EVAL
- */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class ModelLoadTimeEval {
@@ -47,7 +35,6 @@ class ModelLoadTimeEval {
 
     @Before
     fun setUp() {
-        // Force GC before measurements
         System.gc()
         Thread.sleep(200)
     }
@@ -58,13 +45,9 @@ class ModelLoadTimeEval {
         loadedInterpreters.clear()
     }
 
-    // ------------------------------------------------------------------
-    // Cold load time
-    // ------------------------------------------------------------------
-
     @Test
-    fun coldLoadTimeForEachModel() {
-        Log.i(TAG, "=== Model Cold Load Time Eval ===")
+    fun coldAndWarmLoadTimeForEachModel() {
+        Log.i(TAG, "=== Model Cold + Warm Load Time Eval ===")
 
         for (modelAsset in MODEL_ASSETS) {
             if (!hasAsset(modelAsset)) {
@@ -72,96 +55,55 @@ class ModelLoadTimeEval {
                 continue
             }
 
+            // Cold load
             System.gc()
             Thread.sleep(100)
 
-            val memBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
-            val startNs = System.nanoTime()
+            val coldMemBefore = Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() }
+            val coldStartNs = System.nanoTime()
 
-            val interpreter = try {
-                val buffer = loadMappedFile(modelAsset)
-                Interpreter(buffer, Interpreter.Options().apply { setNumThreads(4) })
+            val coldInterpreter = try {
+                Interpreter(loadMappedFile(modelAsset), Interpreter.Options().apply { setNumThreads(4) })
             } catch (e: Throwable) {
                 Log.e(TAG, "FAIL cold_load $modelAsset: ${e.message}")
                 continue
             }
 
-            val elapsedMs = (System.nanoTime() - startNs) / 1_000_000.0
-            val memAfter = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
-            val memDeltaKb = (memAfter - memBefore) / 1024
+            val coldElapsedMs = (System.nanoTime() - coldStartNs) / 1_000_000.0
+            val coldMemDeltaKb = (Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() } - coldMemBefore) / 1024
 
-            loadedInterpreters.add(interpreter)
+            Log.i(TAG, "cold_load $modelAsset: time_ms=${"%.2f".format(coldElapsedMs)} mem_delta_kb=$coldMemDeltaKb")
+            Log.i(TAG, "  input_tensors=${coldInterpreter.inputTensorCount} output_tensors=${coldInterpreter.outputTensorCount}")
+            Log.i(TAG, "  input_shape=${coldInterpreter.getInputTensor(0).shape().contentToString()} output_shape=${coldInterpreter.getOutputTensor(0).shape().contentToString()}")
 
-            Log.i(TAG, "cold_load $modelAsset: time_ms=${"%.2f".format(elapsedMs)} mem_delta_kb=$memDeltaKb")
-            Log.i(TAG, "  input_tensors=${interpreter.inputTensorCount} output_tensors=${interpreter.outputTensorCount}")
+            assertTrue("Cold load should complete in under 30 seconds", coldElapsedMs < 30_000)
 
-            val inputShape = interpreter.getInputTensor(0).shape()
-            val outputShape = interpreter.getOutputTensor(0).shape()
-            Log.i(TAG, "  input_shape=${inputShape.contentToString()} output_shape=${outputShape.contentToString()}")
+            // Close to prepare warm load
+            coldInterpreter.close()
 
-            assertTrue("Cold load should complete in under 30 seconds", elapsedMs < 30_000)
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Warm load (close and reopen)
-    // ------------------------------------------------------------------
-
-    @Test
-    fun warmLoadTimeForEachModel() {
-        Log.i(TAG, "=== Model Warm Load Time Eval ===")
-
-        for (modelAsset in MODEL_ASSETS) {
-            if (!hasAsset(modelAsset)) {
-                Log.i(TAG, "SKIP $modelAsset (not found in assets)")
-                continue
-            }
-
-            // First load to warm caches
-            val buffer = try {
-                loadMappedFile(modelAsset)
-            } catch (e: Throwable) {
-                Log.e(TAG, "FAIL warm_load $modelAsset buffer: ${e.message}")
-                continue
-            }
-
-            val warmUpInterpreter = try {
-                Interpreter(buffer, Interpreter.Options().apply { setNumThreads(4) })
-            } catch (e: Throwable) {
-                Log.e(TAG, "FAIL warm_load $modelAsset first: ${e.message}")
-                continue
-            }
-            warmUpInterpreter.close()
-
-            // Measure warm reload
+            // Warm load (caches primed from cold load)
             System.gc()
             Thread.sleep(50)
 
-            val memBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
-            val startNs = System.nanoTime()
+            val warmMemBefore = Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() }
+            val warmStartNs = System.nanoTime()
 
-            val interpreter = try {
-                val reloadBuffer = loadMappedFile(modelAsset)
-                Interpreter(reloadBuffer, Interpreter.Options().apply { setNumThreads(4) })
+            val warmInterpreter = try {
+                Interpreter(loadMappedFile(modelAsset), Interpreter.Options().apply { setNumThreads(4) })
             } catch (e: Throwable) {
-                Log.e(TAG, "FAIL warm_load $modelAsset reload: ${e.message}")
+                Log.e(TAG, "FAIL warm_load $modelAsset: ${e.message}")
                 continue
             }
 
-            val elapsedMs = (System.nanoTime() - startNs) / 1_000_000.0
-            val memAfter = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
-            val memDeltaKb = (memAfter - memBefore) / 1024
+            val warmElapsedMs = (System.nanoTime() - warmStartNs) / 1_000_000.0
+            val warmMemDeltaKb = (Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() } - warmMemBefore) / 1024
 
-            loadedInterpreters.add(interpreter)
+            loadedInterpreters.add(warmInterpreter)
 
-            Log.i(TAG, "warm_load $modelAsset: time_ms=${"%.2f".format(elapsedMs)} mem_delta_kb=$memDeltaKb")
-            assertTrue("Warm load should complete in under 15 seconds", elapsedMs < 15_000)
+            Log.i(TAG, "warm_load $modelAsset: time_ms=${"%.2f".format(warmElapsedMs)} mem_delta_kb=$warmMemDeltaKb")
+            assertTrue("Warm load should complete in under 15 seconds", warmElapsedMs < 15_000)
         }
     }
-
-    // ------------------------------------------------------------------
-    // Memory delta per model
-    // ------------------------------------------------------------------
 
     @Test
     fun memoryDeltaPerModel() {
@@ -180,8 +122,7 @@ class ModelLoadTimeEval {
             val memBefore = runtime.totalMemory() - runtime.freeMemory()
 
             val interpreter = try {
-                val buffer = loadMappedFile(modelAsset)
-                Interpreter(buffer, Interpreter.Options().apply { setNumThreads(4) })
+                Interpreter(loadMappedFile(modelAsset), Interpreter.Options().apply { setNumThreads(4) })
             } catch (e: Throwable) {
                 Log.e(TAG, "FAIL mem_delta $modelAsset: ${e.message}")
                 continue
@@ -190,36 +131,27 @@ class ModelLoadTimeEval {
             val memAfterLoad = runtime.totalMemory() - runtime.freeMemory()
             val loadDeltaKb = (memAfterLoad - memBefore) / 1024
 
-            // Run one inference to trigger any lazy allocation
             try {
-                val inputTensor = interpreter.getInputTensor(0)
-                val inputSize = inputTensor.shape().reduce { a, b -> a * b }
-                val dummyInput = java.nio.ByteBuffer.allocateDirect(inputSize * 4)
-                    .order(java.nio.ByteOrder.nativeOrder())
-                val outputTensor = interpreter.getOutputTensor(0)
-                val outputSize = outputTensor.shape().reduce { a, b -> a * b }
-                val dummyOutput = java.nio.ByteBuffer.allocateDirect(outputSize * 4)
-                    .order(java.nio.ByteOrder.nativeOrder())
-                interpreter.run(dummyInput, dummyOutput)
+                val inputSize = interpreter.getInputTensor(0).shape().reduce { a, b -> a * b }
+                val outputSize = interpreter.getOutputTensor(0).shape().reduce { a, b -> a * b }
+                interpreter.run(
+                    java.nio.ByteBuffer.allocateDirect(inputSize * 4).order(java.nio.ByteOrder.nativeOrder()),
+                    java.nio.ByteBuffer.allocateDirect(outputSize * 4).order(java.nio.ByteOrder.nativeOrder())
+                )
             } catch (e: Throwable) {
                 Log.w(TAG, "  inference warmup failed for $modelAsset: ${e.message}")
             }
 
             val memAfterInference = runtime.totalMemory() - runtime.freeMemory()
-            val inferenceDeltaKb = (memAfterInference - memAfterLoad) / 1024
-            val totalDeltaKb = (memAfterInference - memBefore) / 1024
 
             loadedInterpreters.add(interpreter)
 
             Log.i(TAG, "mem_delta $modelAsset:")
-            Log.i(TAG, "  load_delta_kb=$loadDeltaKb inference_delta_kb=$inferenceDeltaKb total_delta_kb=$totalDeltaKb")
+            Log.i(TAG, "  load_delta_kb=$loadDeltaKb inference_delta_kb=${(memAfterInference - memAfterLoad) / 1024} total_delta_kb=${(memAfterInference - memBefore) / 1024}")
             Log.i(TAG, "  total_memory_mb=${runtime.totalMemory() / (1024 * 1024)} free_memory_mb=${runtime.freeMemory() / (1024 * 1024)}")
+            assertTrue("Baseline memory before loading $modelAsset should be positive", memBefore > 0)
         }
     }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private fun hasAsset(name: String): Boolean {
         return runCatching {
@@ -230,8 +162,7 @@ class ModelLoadTimeEval {
 
     private fun loadMappedFile(assetName: String): MappedByteBuffer {
         val fd = context.assets.openFd(assetName)
-        val inputStream = FileInputStream(fd.fileDescriptor)
-        return inputStream.channel.map(
+        return FileInputStream(fd.fileDescriptor).channel.map(
             FileChannel.MapMode.READ_ONLY,
             fd.startOffset,
             fd.declaredLength

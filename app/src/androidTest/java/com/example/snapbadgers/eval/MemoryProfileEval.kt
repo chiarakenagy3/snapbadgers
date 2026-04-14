@@ -16,22 +16,12 @@ import com.example.snapbadgers.ai.vision.VisionEncoder
 import com.example.snapbadgers.model.Song
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * MemoryProfileEval
- *
- * Profiles memory usage across the recommendation pipeline to detect
- * leaks and measure peak usage.
- *
- * Requires a device or emulator.
- *
- * Results are logged to Log.i("EVAL", ...) for ADB capture:
- *   adb logcat -s EVAL
- */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class MemoryProfileEval {
@@ -58,10 +48,6 @@ class MemoryProfileEval {
         visionEncoder?.close()
     }
 
-    // ------------------------------------------------------------------
-    // Baseline memory before pipeline creation
-    // ------------------------------------------------------------------
-
     @Test
     fun baselineMemory() {
         forceGc()
@@ -73,11 +59,9 @@ class MemoryProfileEval {
         Log.i(TAG, "=== Memory Baseline ===")
         Log.i(TAG, "baseline: used_kb=$usedKb total_kb=$totalKb max_kb=$maxKb")
         Log.i(TAG, "baseline: used_mb=${usedKb / 1024} total_mb=${totalKb / 1024} max_mb=${maxKb / 1024}")
+        assertTrue("Used memory should be positive", usedKb > 0)
+        assertTrue("Max memory should be positive", maxKb > 0)
     }
-
-    // ------------------------------------------------------------------
-    // Peak memory after pipeline iterations
-    // ------------------------------------------------------------------
 
     @Test
     fun peakMemoryAfterPipelineIterations() = runBlocking {
@@ -91,9 +75,7 @@ class MemoryProfileEval {
         val encoder = VisionEncoder(context).also { visionEncoder = it }
         val fusionEngine = FusionEngine()
         val projectionNetwork = ProjectionNetwork()
-
         val testBitmap = createTestBitmap(224, 224, Color.rgb(128, 128, 128))
-        val testInput = "energetic workout music"
         val sensorEmbedding = VectorUtils.normalize(FloatArray(128) { (it * 7 % 23).toFloat() })
 
         val sampleSongs = listOf(
@@ -109,11 +91,12 @@ class MemoryProfileEval {
         val memorySnapshots = mutableListOf<Long>()
 
         repeat(PIPELINE_ITERATIONS) { iteration ->
-            val textEmb = textEncoder.encode(testInput)
-            val visionEmb = encoder.encode(testBitmap)
-            val fused = fusionEngine.fuse(textEmb, visionEmb, sensorEmbedding)
-            val projected = projectionNetwork.project(fused)
-            val query = VectorUtils.alignToEmbeddingDimension(projected, salt = 101)
+            val fused = fusionEngine.fuse(
+                textEncoder.encode("energetic workout music"),
+                encoder.encode(testBitmap),
+                sensorEmbedding
+            )
+            val query = VectorUtils.alignToEmbeddingDimension(projectionNetwork.project(fused), salt = 101)
             sampleSongs
                 .map { it.copy(similarity = VectorUtils.cosineSimilarity(query, it.embedding)) }
                 .sortedByDescending { it.similarity }
@@ -129,17 +112,14 @@ class MemoryProfileEval {
         forceGc()
         val finalKb = usedMemoryKb()
         val peakKb = memorySnapshots.maxOrNull() ?: finalKb
-        val deltaKb = finalKb - baselineKb
 
         Log.i(TAG, "pipeline_peak_kb: $peakKb")
         Log.i(TAG, "pipeline_final_kb: $finalKb")
-        Log.i(TAG, "pipeline_delta_kb: $deltaKb")
+        Log.i(TAG, "pipeline_delta_kb: ${finalKb - baselineKb}")
         Log.i(TAG, "pipeline_snapshots: ${memorySnapshots.joinToString()}")
+        assertTrue("Peak memory should be positive", peakKb > 0)
+        assertTrue("Should have collected memory snapshots", memorySnapshots.isNotEmpty())
     }
-
-    // ------------------------------------------------------------------
-    // Monotonic growth check (leak indicator)
-    // ------------------------------------------------------------------
 
     @Test
     fun leakDetectionMonotonicGrowth() = runBlocking {
@@ -154,11 +134,10 @@ class MemoryProfileEval {
         val snapshots = mutableListOf<Long>()
 
         repeat(LEAK_CHECK_ITERATIONS) { iteration ->
-            // Run a batch of pipeline operations
             repeat(10) {
-                val text = HeuristicTextEmbedding.encode("test query $iteration $it")
-                val fused = fusionEngine.fuse(text, null, null)
-                projectionNetwork.project(fused)
+                projectionNetwork.project(
+                    fusionEngine.fuse(HeuristicTextEmbedding.encode("test query $iteration $it"), null, null)
+                )
             }
 
             forceGc()
@@ -170,8 +149,6 @@ class MemoryProfileEval {
             }
         }
 
-        // Check for monotonic growth (a strong leak indicator)
-        // Count how many consecutive increases there are
         var consecutiveIncreases = 0
         var maxConsecutiveIncreases = 0
         for (i in 1 until snapshots.size) {
@@ -187,26 +164,20 @@ class MemoryProfileEval {
 
         val firstThird = snapshots.take(snapshots.size / 3).average()
         val lastThird = snapshots.takeLast(snapshots.size / 3).average()
-        val growthKb = lastThird - firstThird
 
         Log.i(TAG, "leak_check_summary:")
         Log.i(TAG, "  iterations: $LEAK_CHECK_ITERATIONS (x10 ops each)")
         Log.i(TAG, "  max_consecutive_increases: $maxConsecutiveIncreases")
         Log.i(TAG, "  first_third_avg_kb: ${"%.0f".format(firstThird)}")
         Log.i(TAG, "  last_third_avg_kb: ${"%.0f".format(lastThird)}")
-        Log.i(TAG, "  growth_kb: ${"%.0f".format(growthKb)}")
+        Log.i(TAG, "  growth_kb: ${"%.0f".format(lastThird - firstThird)}")
         Log.i(TAG, "  snapshots: ${snapshots.joinToString()}")
 
-        // If memory grows monotonically for more than 20 consecutive intervals, likely a leak
         assertTrue(
             "Max consecutive memory increases ($maxConsecutiveIncreases) should be < 20 (leak indicator)",
             maxConsecutiveIncreases < 20
         )
     }
-
-    // ------------------------------------------------------------------
-    // Vision encoder memory impact
-    // ------------------------------------------------------------------
 
     @Test
     fun visionEncoderMemoryImpact() = runBlocking {
@@ -221,7 +192,6 @@ class MemoryProfileEval {
         val afterCreateKb = usedMemoryKb()
         Log.i(TAG, "vision_create_delta_kb: ${afterCreateKb - beforeKb}")
 
-        // First inference triggers model loading
         val bitmap = createTestBitmap(224, 224, Color.rgb(100, 150, 200))
         encoder.encode(bitmap)
 
@@ -229,18 +199,15 @@ class MemoryProfileEval {
         val afterFirstInferenceKb = usedMemoryKb()
         Log.i(TAG, "vision_first_inference_delta_kb: ${afterFirstInferenceKb - afterCreateKb}")
 
-        // Run 20 more inferences
         repeat(20) { encoder.encode(bitmap) }
 
         forceGc()
         val afterManyInferencesKb = usedMemoryKb()
         Log.i(TAG, "vision_20_inferences_delta_kb: ${afterManyInferencesKb - afterFirstInferenceKb}")
         Log.i(TAG, "vision_total_delta_kb: ${afterManyInferencesKb - beforeKb}")
+        assertTrue("Memory before encoder creation should be positive", beforeKb > 0)
+        assertTrue("Memory after encoder creation should be positive", afterCreateKb > 0)
     }
-
-    // ------------------------------------------------------------------
-    // Text encoder memory impact
-    // ------------------------------------------------------------------
 
     @Test
     fun textEncoderMemoryImpact() = runBlocking {
@@ -260,25 +227,21 @@ class MemoryProfileEval {
         Log.i(TAG, "text_encoder_type: ${encoder.label}")
         Log.i(TAG, "text_create_delta_kb: ${afterCreateKb - beforeKb}")
 
-        // First inference
         encoder.encode("test input")
 
         forceGc()
         val afterFirstInferenceKb = usedMemoryKb()
         Log.i(TAG, "text_first_inference_delta_kb: ${afterFirstInferenceKb - afterCreateKb}")
 
-        // 20 more inferences
         repeat(20) { encoder.encode("test input iteration $it") }
 
         forceGc()
         val afterManyInferencesKb = usedMemoryKb()
         Log.i(TAG, "text_20_inferences_delta_kb: ${afterManyInferencesKb - afterFirstInferenceKb}")
         Log.i(TAG, "text_total_delta_kb: ${afterManyInferencesKb - beforeKb}")
+        assertTrue("Memory before encoder creation should be positive", beforeKb > 0)
+        assertNotNull("Text encoder should be created", encoder)
     }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private fun forceGc() {
         System.gc()

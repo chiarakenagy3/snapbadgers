@@ -12,10 +12,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Stress tests for robustness and stability.
- * Tests edge cases, high load, and failure scenarios.
- */
 @RunWith(AndroidJUnit4::class)
 class StressTestSuite {
 
@@ -29,10 +25,7 @@ class StressTestSuite {
 
     @Test
     fun testExtremelyLongTextInput() = runBlocking {
-        println("\n📝 Extreme Long Text Test:")
-        println("━".repeat(60))
-
-        // 10,000 word input
+        println("EVAL Extreme Long Text Test")
         val longText = (1..10000).joinToString(" ") { "word$it" }
         println("  Input length: ${longText.length} characters")
 
@@ -42,7 +35,6 @@ class StressTestSuite {
 
         println("  Processing time: ${elapsed}ms")
         println("  Recommendations: ${result.recommendations.size}")
-        println("━".repeat(60))
 
         assertTrue("Should handle long input", result.recommendations.isNotEmpty())
         assertTrue("Should complete in reasonable time", elapsed < 10000)
@@ -50,9 +42,7 @@ class StressTestSuite {
 
     @Test
     fun testRapidConsecutiveRequests() = runBlocking {
-        println("\n⚡ Rapid Consecutive Requests Test:")
-        println("━".repeat(60))
-
+        println("EVAL Rapid Consecutive Requests Test")
         val queries = (1..50).map { "query $it" }
 
         val start = System.currentTimeMillis()
@@ -65,39 +55,31 @@ class StressTestSuite {
         println("  Total time: ${elapsed}ms")
         println("  Avg per request: ${elapsed / queries.size}ms")
         println("  Throughput: ${"%.2f".format(queries.size * 1000.0 / elapsed)} req/sec")
-        println("━".repeat(60))
 
         assertTrue("Should handle rapid requests", elapsed < 30000)
     }
 
     @Test
     fun testParallelRequestLoad() = runBlocking {
-        println("\n🔀 Parallel Request Load Test:")
-        println("━".repeat(60))
-
+        println("EVAL Parallel Request Load Test")
         val queries = (1..10).map { "parallel query $it" }
 
         val start = System.currentTimeMillis()
         val results = queries.map { query ->
-            async {
-                pipeline.runPipeline(query, onStepUpdate = {})
-            }
+            async { pipeline.runPipeline(query, onStepUpdate = {}) }
         }.awaitAll()
         val elapsed = System.currentTimeMillis() - start
 
         println("  Parallel requests: ${queries.size}")
         println("  Total time: ${elapsed}ms")
         println("  All completed: ${results.all { it.recommendations.isNotEmpty() }}")
-        println("━".repeat(60))
 
         assertTrue("All requests should succeed", results.all { it.recommendations.isNotEmpty() })
     }
 
     @Test
     fun testMalformedInputs() = runBlocking {
-        println("\n🔍 Malformed Input Test:")
-        println("━".repeat(60))
-
+        println("EVAL Malformed Input Test")
         val malformedInputs = listOf(
             "",                                    // Empty
             "   ",                                 // Whitespace
@@ -117,39 +99,29 @@ class StressTestSuite {
         malformedInputs.forEach { input ->
             try {
                 val result = pipeline.runPipeline(input.take(1000), onStepUpdate = {})
-                if (result.recommendations.isNotEmpty()) {
-                    successCount++
-                }
+                if (result.recommendations.isNotEmpty()) successCount++
                 println("  ✓ Handled: ${input.take(30).replace("\n", "\\n")}")
             } catch (e: Exception) {
                 println("  ✗ Failed: ${input.take(30)} - ${e.message}")
             }
         }
 
-        println("\n  Success rate: $successCount/${malformedInputs.size}")
-        println("━".repeat(60))
-
-        // Should handle most malformed inputs gracefully
+        println("  Success rate: $successCount/${malformedInputs.size}")
         assertTrue("Should handle majority of malformed inputs",
             successCount >= malformedInputs.size * 0.8)
     }
 
     @Test
     fun testMemoryLeakDetection() = runBlocking {
-        println("\n💧 Memory Leak Detection:")
-        println("━".repeat(60))
-
+        println("EVAL Memory Leak Detection")
         val runtime = Runtime.getRuntime()
 
-        // Baseline
         System.gc()
         Thread.sleep(100)
         val baselineMemory = runtime.totalMemory() - runtime.freeMemory()
 
-        // Run many iterations
         repeat(100) { iteration ->
             pipeline.runPipeline("iteration $iteration", onStepUpdate = {})
-
             if (iteration % 20 == 19) {
                 System.gc()
                 Thread.sleep(50)
@@ -159,34 +131,22 @@ class StressTestSuite {
             }
         }
 
-        // Final check
         System.gc()
         Thread.sleep(100)
         val finalMemory = runtime.totalMemory() - runtime.freeMemory()
         val totalIncrease = (finalMemory - baselineMemory) / (1024 * 1024)
 
-        println("\n  Total memory increase: ${totalIncrease}MB")
+        println("  Total memory increase: ${totalIncrease}MB")
+        if (totalIncrease < 20) println("  ✅ NO LEAK detected")
+        else if (totalIncrease < 50) println("  ⚠️ MINOR growth - investigate")
+        else println("  ❌ POTENTIAL LEAK - investigate")
 
-        if (totalIncrease < 20) {
-            println("  ✅ NO LEAK detected")
-        } else if (totalIncrease < 50) {
-            println("  ⚠️ MINOR growth - investigate")
-        } else {
-            println("  ❌ POTENTIAL LEAK - investigate")
-        }
-
-        println("━".repeat(60))
-
-        // Memory increase should be bounded
-        assertTrue("Memory should not grow excessively (got ${totalIncrease}MB)",
-            totalIncrease < 100)
+        assertTrue("Memory should not grow excessively (got ${totalIncrease}MB)", totalIncrease < 100)
     }
 
     @Test
     fun testExtremeImageSizes() = runBlocking {
-        println("\n🖼️ Extreme Image Size Test:")
-        println("━".repeat(60))
-
+        println("EVAL Extreme Image Size Test")
         val testCases = listOf(
             "1x1 tiny" to createBitmap(1, 1),
             "10x10 small" to createBitmap(10, 10),
@@ -199,12 +159,9 @@ class StressTestSuite {
             try {
                 val start = System.currentTimeMillis()
                 val result = pipeline.runPipeline(
-                    input = "test",
-                    imageBitmap = bitmap,
-                    onStepUpdate = {}
+                    input = "test", imageBitmap = bitmap, onStepUpdate = {}
                 )
                 val elapsed = System.currentTimeMillis() - start
-
                 println("  ✓ $description: ${elapsed}ms")
                 assertTrue("Should return results", result.recommendations.isNotEmpty())
             } catch (e: Exception) {
@@ -212,15 +169,11 @@ class StressTestSuite {
                 fail("Should handle $description: ${e.message}")
             }
         }
-
-        println("━".repeat(60))
     }
 
     @Test
     fun testConcurrentTextAndVisionRequests() = runBlocking {
-        println("\n🔄 Concurrent Multimodal Test:")
-        println("━".repeat(60))
-
+        println("EVAL Concurrent Multimodal Test")
         val bitmap = createBitmap(224, 224)
 
         val start = System.currentTimeMillis()
@@ -236,42 +189,28 @@ class StressTestSuite {
         val elapsed = System.currentTimeMillis() - start
 
         val allSucceeded = results.all { it.recommendations.isNotEmpty() }
-
-        println("  Requests: ${results.size}")
-        println("  Total time: ${elapsed}ms")
+        println("  Requests: ${results.size}, Total time: ${elapsed}ms")
         println("  All succeeded: $allSucceeded")
         println("  With vision: ${results.count { it.usedVisionInput }}")
         println("  Text only: ${results.count { !it.usedVisionInput }}")
-        println("━".repeat(60))
 
         assertTrue("All concurrent requests should succeed", allSucceeded)
     }
 
     @Test
     fun testRepeatedPipelineCreationAndDestruction() = runBlocking {
-        println("\n♻️ Pipeline Creation/Destruction Test:")
-        println("━".repeat(60))
-
+        println("EVAL Pipeline Creation/Destruction Test")
         repeat(20) { iteration ->
             val tempPipeline = RecommendationPipeline(context)
             val result = tempPipeline.runPipeline("test $iteration", onStepUpdate = {})
-
-            assertTrue("Iteration $iteration should succeed",
-                result.recommendations.isNotEmpty())
-
-            if (iteration % 5 == 4) {
-                println("  ✓ ${iteration + 1} pipelines created and used")
-            }
+            assertTrue("Iteration $iteration should succeed", result.recommendations.isNotEmpty())
+            if (iteration % 5 == 4) println("  ✓ ${iteration + 1} pipelines created and used")
         }
-
-        println("━".repeat(60))
     }
 
     @Test
     fun testEdgeCaseEmbeddings() = runBlocking {
-        println("\n🔬 Edge Case Embeddings Test:")
-        println("━".repeat(60))
-
+        println("EVAL Edge Case Embeddings Test")
         val edgeCases = mapOf(
             "All same character" to "aaaaaaaaaaaaaaaaaaaaaa",
             "Repeated word" to "music music music music music",
@@ -286,36 +225,27 @@ class StressTestSuite {
         edgeCases.forEach { (description, input) ->
             val result = pipeline.runPipeline(input, onStepUpdate = {})
             println("  ✓ $description: ${result.recommendations.size} recs")
-            assertTrue("$description should return results",
-                result.recommendations.isNotEmpty())
+            assertTrue("$description should return results", result.recommendations.isNotEmpty())
         }
-
-        println("━".repeat(60))
     }
 
     @Test
     fun testExtremeSensorConditions() = runBlocking {
-        println("\n📡 Sensor Edge Case Test:")
-        println("━".repeat(60))
-
-        // Run multiple requests to capture different sensor states
+        println("EVAL Sensor Edge Case Test")
         val results = (1..20).map { iteration ->
             val result = pipeline.runPipeline("sensor test $iteration", onStepUpdate = {})
             result.recommendations.isNotEmpty()
         }
 
         val successRate = results.count { it }.toFloat() / results.size
-
         println("  Success rate: ${(successRate * 100).toInt()}%")
         println("  Total runs: ${results.size}")
-        println("━".repeat(60))
 
         assertTrue("Should handle sensor variations", successRate > 0.9)
     }
 
     private fun createBitmap(width: Int, height: Int): Bitmap {
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
-            // Fill with gradient
             for (y in 0 until height) {
                 for (x in 0 until width) {
                     val r = if (width > 1) (x * 255 / (width - 1)) else 128

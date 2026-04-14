@@ -23,17 +23,6 @@ import org.junit.runner.RunWith
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * ModelAccuracyEval
- *
- * Feeds known inputs to each model and verifies outputs match expected
- * characteristics. Tests cross-run consistency (bit-identical outputs).
- *
- * Requires a device or emulator.
- *
- * Results are logged to Log.i("EVAL", ...) for ADB capture:
- *   adb logcat -s EVAL
- */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class ModelAccuracyEval {
@@ -59,10 +48,6 @@ class ModelAccuracyEval {
         visionEncoder?.close()
     }
 
-    // ------------------------------------------------------------------
-    // Text encoder accuracy
-    // ------------------------------------------------------------------
-
     @Test
     fun textEncoderKnownInputs() = runBlocking {
         Log.i(TAG, "=== Text Encoder Accuracy Eval ===")
@@ -76,21 +61,16 @@ class ModelAccuracyEval {
 
         Log.i(TAG, "text_encoder: ${encoder.label}")
 
-        // Test 1: "calm relaxing music" should produce a valid embedding
         val calmEmbedding = encoder.encode("calm relaxing music")
         assertEquals("Embedding dimension", EMBEDDING_DIMENSION, calmEmbedding.size)
         assertTrue("Non-blank input should produce non-zero embedding", calmEmbedding.any { abs(it) > 1e-6f })
-        val calmNorm = sqrt(calmEmbedding.sumOf { (it * it).toDouble() }).toFloat()
-        Log.i(TAG, "text_calm: dim=${calmEmbedding.size} norm=$calmNorm nonzero=${calmEmbedding.count { abs(it) > 1e-6f }}")
+        Log.i(TAG, "text_calm: dim=${calmEmbedding.size} norm=${"%.4f".format(sqrt(calmEmbedding.sumOf { (it * it).toDouble() }).toFloat())} nonzero=${calmEmbedding.count { abs(it) > 1e-6f }}")
 
-        // Test 2: Blank input should produce zero vector
         val blankEmbedding = encoder.encode("")
         assertTrue("Blank input should produce zero embedding", blankEmbedding.all { abs(it) < 1e-6f })
         Log.i(TAG, "text_blank: all_zero=true")
 
-        // Test 3: Different moods should produce different embeddings
-        val workoutEmbedding = encoder.encode("intense workout running")
-        val similarity = VectorUtils.cosineSimilarity(calmEmbedding, workoutEmbedding)
+        val similarity = VectorUtils.cosineSimilarity(calmEmbedding, encoder.encode("intense workout running"))
         Log.i(TAG, "text_mood_separation: calm_vs_workout_similarity=$similarity")
         assertTrue("Different moods should produce different embeddings", similarity < 0.99f)
     }
@@ -107,7 +87,6 @@ class ModelAccuracyEval {
 
         val testInput = "calm relaxing study music"
         val reference = encoder.encode(testInput)
-
         var identical = 0
         var different = 0
 
@@ -117,9 +96,7 @@ class ModelAccuracyEval {
                 identical++
             } else {
                 different++
-                // Log the max difference for debugging
-                val maxDiff = reference.zip(current.toList()).maxOfOrNull { (a, b) -> abs(a - b) } ?: 0f
-                Log.i(TAG, "text_consistency: run=$it max_diff=$maxDiff")
+                Log.i(TAG, "text_consistency: run=$it max_diff=${reference.zip(current.toList()).maxOfOrNull { (a, b) -> abs(a - b) } ?: 0f}")
             }
         }
 
@@ -127,17 +104,12 @@ class ModelAccuracyEval {
         assertTrue("At least 9/10 runs should be identical", identical >= 9)
     }
 
-    // ------------------------------------------------------------------
-    // Vision encoder accuracy
-    // ------------------------------------------------------------------
-
     @Test
     fun visionEncoderKnownInputs() = runBlocking {
         Log.i(TAG, "=== Vision Encoder Accuracy Eval ===")
 
         val encoder = VisionEncoder(context).also { visionEncoder = it }
 
-        // Test with solid color bitmaps
         val colors = mapOf(
             "red" to Color.RED,
             "blue" to Color.BLUE,
@@ -149,28 +121,21 @@ class ModelAccuracyEval {
         val embeddings = mutableMapOf<String, FloatArray>()
 
         for ((name, color) in colors) {
-            val bitmap = createSolidBitmap(224, 224, color)
-            val embedding = encoder.encode(bitmap)
+            val embedding = encoder.encode(createSolidBitmap(224, 224, color))
 
             assertEquals("Vision embedding should be ${EMBEDDING_DIMENSION}-d", EMBEDDING_DIMENSION, embedding.size)
             assertTrue("No NaN in vision embedding for $name", embedding.none { it.isNaN() })
             assertTrue("No Inf in vision embedding for $name", embedding.none { it.isInfinite() })
 
-            val norm = sqrt(embedding.sumOf { (it * it).toDouble() }).toFloat()
-            Log.i(TAG, "vision_$name: dim=${embedding.size} norm=${"%.4f".format(norm)} nonzero=${embedding.count { abs(it) > 1e-6f }}")
+            Log.i(TAG, "vision_$name: dim=${embedding.size} norm=${"%.4f".format(sqrt(embedding.sumOf { (it * it).toDouble() }).toFloat())} nonzero=${embedding.count { abs(it) > 1e-6f }}")
 
             embeddings[name] = embedding
         }
 
-        // Different colors should produce at least somewhat different embeddings
-        val redBlue = VectorUtils.cosineSimilarity(embeddings["red"]!!, embeddings["blue"]!!)
-        val redGreen = VectorUtils.cosineSimilarity(embeddings["red"]!!, embeddings["green"]!!)
-        val blackWhite = VectorUtils.cosineSimilarity(embeddings["black"]!!, embeddings["white"]!!)
-
         Log.i(TAG, "vision_color_similarity:")
-        Log.i(TAG, "  red_vs_blue: $redBlue")
-        Log.i(TAG, "  red_vs_green: $redGreen")
-        Log.i(TAG, "  black_vs_white: $blackWhite")
+        Log.i(TAG, "  red_vs_blue: ${VectorUtils.cosineSimilarity(embeddings["red"]!!, embeddings["blue"]!!)}")
+        Log.i(TAG, "  red_vs_green: ${VectorUtils.cosineSimilarity(embeddings["red"]!!, embeddings["green"]!!)}")
+        Log.i(TAG, "  black_vs_white: ${VectorUtils.cosineSimilarity(embeddings["black"]!!, embeddings["white"]!!)}")
     }
 
     @Test
@@ -179,7 +144,6 @@ class ModelAccuracyEval {
 
         val encoder = VisionEncoder(context).also { visionEncoder = it }
         val bitmap = createSolidBitmap(224, 224, Color.rgb(128, 128, 128))
-
         val reference = encoder.encode(bitmap)
         var identical = 0
         var maxDrift = 0f
@@ -204,66 +168,36 @@ class ModelAccuracyEval {
 
         val encoder = VisionEncoder(context).also { visionEncoder = it }
         val bitmap = createSolidBitmap(128, 128, Color.rgb(200, 100, 50))
-
         val reference = encoder.encode(bitmap)
         var allBitIdentical = true
 
         repeat(10) {
-            val current = encoder.encode(bitmap)
-            if (!reference.contentEquals(current)) {
+            if (!reference.contentEquals(encoder.encode(bitmap))) {
                 allBitIdentical = false
             }
         }
 
         Log.i(TAG, "vision_cross_run_10x: bit_identical=$allBitIdentical")
+        assertTrue("Vision encoder should be deterministic across 10 runs", allBitIdentical)
     }
-
-    // ------------------------------------------------------------------
-    // Heuristic text embedding accuracy (always available)
-    // ------------------------------------------------------------------
 
     @Test
     fun heuristicEmbeddingAccuracy() {
         Log.i(TAG, "=== Heuristic Embedding Accuracy ===")
 
-        // Verify keyword detection
-        val calmEmb = HeuristicTextEmbedding.encode("calm music")
-        assertTrue("'calm' should activate dimension 2", calmEmb[2] > 0f)
-
-        val studyEmb = HeuristicTextEmbedding.encode("study focus")
-        assertTrue("'study' should activate dimension 3", studyEmb[3] > 0f)
-
-        val happyEmb = HeuristicTextEmbedding.encode("happy vibes")
-        assertTrue("'happy' should activate dimension 4", happyEmb[4] > 0f)
-
-        val sadEmb = HeuristicTextEmbedding.encode("sad lonely")
-        assertTrue("'sad' should activate dimension 5", sadEmb[5] > 0f)
-
-        val workoutEmb = HeuristicTextEmbedding.encode("workout energy")
-        assertTrue("'workout' should activate dimension 6", workoutEmb[6] > 0f)
-
-        val nightEmb = HeuristicTextEmbedding.encode("night drive")
-        assertTrue("'night' should activate dimension 7", nightEmb[7] > 0f)
+        assertTrue("'calm' should activate dimension 2", HeuristicTextEmbedding.encode("calm music")[2] > 0f)
+        assertTrue("'study' should activate dimension 3", HeuristicTextEmbedding.encode("study focus")[3] > 0f)
+        assertTrue("'happy' should activate dimension 4", HeuristicTextEmbedding.encode("happy vibes")[4] > 0f)
+        assertTrue("'sad' should activate dimension 5", HeuristicTextEmbedding.encode("sad lonely")[5] > 0f)
+        assertTrue("'workout' should activate dimension 6", HeuristicTextEmbedding.encode("workout energy")[6] > 0f)
+        assertTrue("'night' should activate dimension 7", HeuristicTextEmbedding.encode("night drive")[7] > 0f)
 
         Log.i(TAG, "heuristic_keyword_accuracy: all 6 keywords correctly detected")
 
-        // Cross-mood separation
-        val pairs = listOf(
-            "calm" to "workout",
-            "happy" to "sad",
-            "study" to "night"
-        )
-        for ((a, b) in pairs) {
-            val embA = HeuristicTextEmbedding.encode("$a music")
-            val embB = HeuristicTextEmbedding.encode("$b music")
-            val sim = VectorUtils.cosineSimilarity(embA, embB)
-            Log.i(TAG, "heuristic_separation: $a vs $b = $sim")
+        listOf("calm" to "workout", "happy" to "sad", "study" to "night").forEach { (a, b) ->
+            Log.i(TAG, "heuristic_separation: $a vs $b = ${VectorUtils.cosineSimilarity(HeuristicTextEmbedding.encode("$a music"), HeuristicTextEmbedding.encode("$b music"))}")
         }
     }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private fun createSolidBitmap(width: Int, height: Int, color: Int): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
