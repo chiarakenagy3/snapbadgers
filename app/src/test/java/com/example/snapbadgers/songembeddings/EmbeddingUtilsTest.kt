@@ -1,5 +1,6 @@
 package com.example.snapbadgers.songembeddings
 
+import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.songembeddings.embedding.*
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
 import org.junit.Assert.*
@@ -93,7 +94,7 @@ class EmbeddingUtilsTest {
             FloatArray(128) { 1e-10f } to "small",
             FloatArray(128) { if (it % 2 == 0) 1f else -1f } to "negative",
         ).forEach { (vec, label) ->
-            val normalized = normalize(vec)
+            val normalized = VectorUtils.normalize(vec)
             assertEquals("$label: size preserved", 128, normalized.size)
             assertTrue("$label: no NaN", normalized.none { it.isNaN() })
             val mag = sqrt(normalized.map { it * it }.sum())
@@ -104,8 +105,8 @@ class EmbeddingUtilsTest {
     @Test
     fun `normalize is idempotent`() {
         val vec = FloatArray(128) { it * 0.01f }
-        val n1 = normalize(vec)
-        assertArrayEquals(n1, normalize(n1), 0.0001f)
+        val n1 = VectorUtils.normalize(vec)
+        assertArrayEquals(n1, VectorUtils.normalize(n1), 0.0001f)
     }
 
     @Test

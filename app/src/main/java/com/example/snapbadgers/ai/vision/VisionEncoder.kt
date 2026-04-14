@@ -3,6 +3,7 @@ package com.example.snapbadgers.ai.vision
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
+import com.example.snapbadgers.ai.common.EncoderUtils
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,7 +19,7 @@ class VisionEncoder(
     private val modelInitMutex = Mutex()
 
     private var modelEncoder: QualcommVisionEncoder? = null
-    private var forceStubFallback = !hasAsset(appContext, modelAsset)
+    private var forceStubFallback = !EncoderUtils.hasAsset(appContext, modelAsset)
 
     suspend fun encode(bitmap: Bitmap): FloatArray {
         if (forceStubFallback) {
@@ -32,15 +33,15 @@ class VisionEncoder(
 
         return try {
             val embedding = activeModelEncoder.encode(bitmap)
-            if (isZeroVector(embedding)) {
-                logWarning("Vision model produced a zero vector. Falling back to stub image encoder.")
+            if (EncoderUtils.isZeroVector(embedding)) {
+                EncoderUtils.logWarning(TAG, "Vision model produced a zero vector. Falling back to stub image encoder.")
                 switchToStubFallback()
                 encodeStub(bitmap)
             } else {
                 VectorUtils.alignToEmbeddingDimension(embedding, salt = MODEL_OUTPUT_SALT)
             }
         } catch (throwable: Throwable) {
-            logWarning("Vision model inference failed. Falling back to stub image encoder.", throwable)
+            EncoderUtils.logWarning(TAG, "Vision model inference failed. Falling back to stub image encoder.", throwable)
             switchToStubFallback()
             encodeStub(bitmap)
         }
@@ -62,7 +63,7 @@ class VisionEncoder(
             return runCatching {
                 QualcommVisionEncoder(context = appContext, modelPath = modelAsset)
             }.onFailure { throwable ->
-                logWarning("Vision model initialization failed. Falling back to stub image encoder.", throwable)
+                EncoderUtils.logWarning(TAG, "Vision model initialization failed. Falling back to stub image encoder.", throwable)
                 forceStubFallback = true
             }.getOrNull()?.also { initializedEncoder ->
                 modelEncoder = initializedEncoder
@@ -131,35 +132,10 @@ class VisionEncoder(
         return VectorUtils.alignToEmbeddingDimension(raw, salt = STUB_OUTPUT_SALT)
     }
 
-    private fun isZeroVector(vector: FloatArray): Boolean {
-        return vector.none { abs(it) > ZERO_THRESHOLD }
-    }
-
-    private fun hasAsset(context: Context, assetName: String): Boolean {
-        return runCatching {
-            context.assets.open(assetName).use { }
-            true
-        }.getOrDefault(false)
-    }
-
-    private fun logWarning(message: String, throwable: Throwable? = null) {
-        runCatching {
-            if (throwable == null) {
-                Log.w(TAG, message)
-            } else {
-                Log.w(TAG, message, throwable)
-            }
-        }.getOrElse {
-            val suffix = throwable?.let { ": ${it.message}" }.orEmpty()
-            System.err.println("$TAG: $message$suffix")
-        }
-    }
-
     private companion object {
         const val TAG = "VisionEncoder"
         const val MODEL_ASSET = "efficientnet_b0_128d_int8.tflite"
         const val SAMPLE_GRID_SIZE = 16
-        const val ZERO_THRESHOLD = 1e-6f
         const val MODEL_OUTPUT_SALT = 211
         const val STUB_OUTPUT_SALT = 223
     }

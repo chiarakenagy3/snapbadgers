@@ -12,7 +12,6 @@ import com.example.snapbadgers.model.Song
 import com.example.snapbadgers.songembeddings.embedding.MLPProjector
 import com.example.snapbadgers.songembeddings.embedding.addDerivedFeatures
 import com.example.snapbadgers.songembeddings.embedding.buildBaseVector
-import com.example.snapbadgers.songembeddings.embedding.normalize
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -116,7 +115,7 @@ class PipelineCorrectnessEvalTest {
         assertEquals(128, embedding.size)
         assertArrayEquals(embedding, MLPProjector.project(combined), 0f)
 
-        val norm = sqrt(normalize(embedding).sumOf { (it * it).toDouble() }).toFloat()
+        val norm = sqrt(VectorUtils.normalize(embedding).sumOf { (it * it).toDouble() }).toFloat()
         assertEquals(1.0f, norm, 1e-4f)
 
         println("EVAL mlp_projector_fallback: dim=${embedding.size}")

@@ -2,6 +2,7 @@ package com.example.snapbadgers.ai.text.ml
 
 import android.content.Context
 import android.util.Log
+import com.example.snapbadgers.ai.common.EncoderUtils
 import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.ai.text.TextEncoder
@@ -54,7 +55,7 @@ class QualcommTextEncoder(
             nnApiDelegate = NnApiDelegate()
             options.addDelegate(nnApiDelegate)
         } catch (e: Throwable) {
-            logWarning("NNAPI delegate unavailable, falling back to CPU", e)
+            EncoderUtils.logWarning(TAG, "NNAPI delegate unavailable, falling back to CPU", e)
             nnApiDelegate?.close()
             nnApiDelegate = null
         }
@@ -99,7 +100,7 @@ class QualcommTextEncoder(
             interpreter?.run(inputBuffer, outputBuffer)
             return@withContext VectorUtils.normalize(outputBuffer[0])
         } catch (exception: Exception) {
-            logWarning("Text model inference failed", exception)
+            EncoderUtils.logWarning(TAG, "Text model inference failed", exception)
             throw exception
         }
     }
@@ -107,19 +108,6 @@ class QualcommTextEncoder(
     override fun close() {
         interpreter?.close()
         nnApiDelegate?.close()
-    }
-
-    private fun logWarning(message: String, throwable: Throwable? = null) {
-        runCatching {
-            if (throwable == null) {
-                Log.w(TAG, message)
-            } else {
-                Log.w(TAG, message, throwable)
-            }
-        }.getOrElse {
-            val suffix = throwable?.let { ": ${it.message}" }.orEmpty()
-            System.err.println("$TAG: $message$suffix")
-        }
     }
 
     private companion object {

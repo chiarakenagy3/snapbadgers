@@ -1,7 +1,7 @@
 package com.example.snapbadgers.ai.text
 
 import android.content.Context
-import android.util.Log
+import com.example.snapbadgers.ai.common.EncoderUtils
 import com.example.snapbadgers.ai.text.ml.BertTokenizer
 import com.example.snapbadgers.ai.text.ml.QualcommTextEncoder
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +25,7 @@ interface TextEncoder {
 
 object TextEncoderFactory {
     fun describe(context: Context): TextEncoderDescriptor {
-        return if (hasAsset(context, MODEL_ASSET) && hasAsset(context, VOCAB_ASSET)) {
+        return if (EncoderUtils.hasAsset(context, MODEL_ASSET) && EncoderUtils.hasAsset(context, VOCAB_ASSET)) {
             TextEncoderDescriptor(
                 mode = TextEncoderMode.MODEL,
                 label = "Qualcomm MobileBERT (NNAPI)"
@@ -39,7 +39,7 @@ object TextEncoderFactory {
     }
 
     fun create(context: Context): TextEncoder {
-        if (!hasAsset(context, MODEL_ASSET) || !hasAsset(context, VOCAB_ASSET)) {
+        if (describe(context).mode == TextEncoderMode.STUB) {
             return StubTextEncoder("Stub heuristic encoder (model assets missing)")
         }
 
@@ -55,7 +55,7 @@ object TextEncoderFactory {
                 fallback = StubTextEncoder("Stub heuristic encoder (model runtime fallback)")
             )
         }.onFailure {
-            Log.w(TAG, "Falling back to StubTextEncoder", it)
+            EncoderUtils.logWarning(TAG, "Falling back to StubTextEncoder", it)
         }.getOrElse {
             StubTextEncoder("Stub heuristic encoder (model init failed)")
         }
@@ -63,13 +63,6 @@ object TextEncoderFactory {
 
     suspend fun createAsync(context: Context): TextEncoder = withContext(Dispatchers.Default) {
         create(context)
-    }
-
-    private fun hasAsset(context: Context, assetName: String): Boolean {
-        return runCatching {
-            context.assets.open(assetName).use { }
-            true
-        }.getOrDefault(false)
     }
 
     private const val TAG = "TextEncoderFactory"

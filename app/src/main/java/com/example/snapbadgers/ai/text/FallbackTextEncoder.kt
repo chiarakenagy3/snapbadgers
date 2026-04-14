@@ -1,7 +1,6 @@
 package com.example.snapbadgers.ai.text
 
-import android.util.Log
-import kotlin.math.abs
+import com.example.snapbadgers.ai.common.EncoderUtils
 
 class FallbackTextEncoder(
     private val primary: TextEncoder,
@@ -25,15 +24,15 @@ class FallbackTextEncoder(
 
         return try {
             val result = currentEncoder.encode(text)
-            if (text.isNotBlank() && isZeroVector(result)) {
-                logWarning("Model-backed text encoder produced a zero vector for non-blank input. Falling back to stub.")
+            if (text.isNotBlank() && EncoderUtils.isZeroVector(result)) {
+                EncoderUtils.logWarning(tag, "Model-backed text encoder produced a zero vector for non-blank input. Falling back to stub.")
                 switchToFallback()
                 fallback.encode(text)
             } else {
                 result
             }
         } catch (throwable: Throwable) {
-            logWarning("Model-backed text encoder failed during encode. Falling back to stub.", throwable)
+            EncoderUtils.logWarning(tag, "Model-backed text encoder failed during encode. Falling back to stub.", throwable)
             switchToFallback()
             fallback.encode(text)
         }
@@ -50,26 +49,5 @@ class FallbackTextEncoder(
         if (activeEncoder === fallback) return
         (activeEncoder as? AutoCloseable)?.close()
         activeEncoder = fallback
-    }
-
-    private fun isZeroVector(vector: FloatArray): Boolean {
-        return vector.none { abs(it) > ZERO_THRESHOLD }
-    }
-
-    private fun logWarning(message: String, throwable: Throwable? = null) {
-        runCatching {
-            if (throwable == null) {
-                Log.w(tag, message)
-            } else {
-                Log.w(tag, message, throwable)
-            }
-        }.getOrElse {
-            val suffix = throwable?.let { ": ${it.message}" }.orEmpty()
-            System.err.println("$tag: $message$suffix")
-        }
-    }
-
-    private companion object {
-        const val ZERO_THRESHOLD = 1e-6f
     }
 }

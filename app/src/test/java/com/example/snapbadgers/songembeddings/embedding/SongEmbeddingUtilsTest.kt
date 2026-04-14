@@ -1,5 +1,6 @@
 package com.example.snapbadgers.songembeddings.embedding
 
+import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -56,6 +57,6 @@ class SongEmbeddingUtilsTest {
 
     @Test
     fun `normalize should return zero vector for near-zero input`() {
-        assertTrue(normalize(FloatArray(8) { 0f }).all { it == 0f })
+        assertTrue(VectorUtils.normalize(FloatArray(8) { 0f }).all { it == 0f })
     }
 }

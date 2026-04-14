@@ -2,6 +2,7 @@ package com.example.snapbadgers.songembeddings.embedding
 
 import android.content.Context
 import android.util.Log
+import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
@@ -293,15 +294,8 @@ fun getEmbedding(features: AudioFeatures?): FloatArray {
     val combined = base + derived
 
     var embedding = MLPProjector.project(combined)
-    embedding = normalize(embedding)
+    embedding = VectorUtils.normalize(embedding)
 
     return embedding
 }
 
-fun normalize(vec: FloatArray): FloatArray {
-    var sum = 0f
-    for (v in vec) sum += v * v
-    val norm = sqrt(sum)
-    if (norm < 1e-8f) return FloatArray(vec.size) { 0f }
-    return FloatArray(vec.size) { i -> vec[i] / norm }
-}
