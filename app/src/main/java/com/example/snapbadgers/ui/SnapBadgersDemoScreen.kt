@@ -1,6 +1,10 @@
 package com.example.snapbadgers.ui
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,6 +59,7 @@ import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
 import com.example.snapbadgers.data.SettingsRepository
 import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.InferenceSteps
+import com.example.snapbadgers.model.Song
 import com.example.snapbadgers.model.UiState
 import com.example.snapbadgers.ui.components.CameraInputCard
 import com.example.snapbadgers.ui.components.HistoryScreen
@@ -62,11 +67,14 @@ import com.example.snapbadgers.ui.components.InferenceStatusCard
 import com.example.snapbadgers.ui.components.LibraryScreen
 import com.example.snapbadgers.ui.components.RecommendationCard
 import com.example.snapbadgers.ui.components.SettingsScreen
+import com.example.snapbadgers.ui.connectivity.rememberIsOnline
 import com.example.snapbadgers.ui.i18n.AppI18n
 import com.example.snapbadgers.ui.i18n.AppStrings
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @Composable
 fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
@@ -84,6 +92,7 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
     
     val history = remember { mutableStateListOf<HistoryItem>() }
     val allSongs = remember(pipeline) { pipeline.getAllSongs() }
+    val isOnline by rememberIsOnline()
 
     LaunchedEffect(pipeline) {
         pipeline.warmUp()
@@ -155,6 +164,8 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
                                 result = successState.result,
                                 encoderLabel = pipeline.textEncoderLabel,
                                 isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
+                                isSpotifyActionEnabled = isOnline,
+                                onOpenInSpotify = { song -> openSongInSpotify(context, song) },
                                 onReset = {
                                     state = UiState.Idle
                                     activeTab = "analyze"
@@ -203,6 +214,33 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
                 }
             }
         }
+    }
+}
+
+private fun openSongInSpotify(context: Context, song: Song) {
+    val trackId = song.spotifyTrackId?.takeIf { it.isNotBlank() }
+    val trackUri = trackId?.let { "spotify:track:$it" }
+    val query = "${song.title} ${song.artist}".trim()
+    val encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
+    val searchUri = "https://open.spotify.com/search/$encodedQuery"
+
+    val intents = buildList {
+        if (trackUri != null) {
+            add(Intent(Intent.ACTION_VIEW, Uri.parse(trackUri)))
+            add(Intent(Intent.ACTION_VIEW, Uri.parse("https://open.spotify.com/track/$trackId")))
+        }
+        add(Intent(Intent.ACTION_VIEW, Uri.parse(searchUri)))
+    }
+
+    val launched = intents.any { intent ->
+        runCatching {
+            context.startActivity(intent)
+            true
+        }.getOrElse { false }
+    }
+
+    if (!launched) {
+        Toast.makeText(context, "Unable to open Spotify on this device.", Toast.LENGTH_SHORT).show()
     }
 }
 

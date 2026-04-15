@@ -35,6 +35,8 @@ fun RecommendationCard(
     result: RecommendationResult,
     encoderLabel: String,
     isModelBackedEncoder: Boolean,
+    isSpotifyActionEnabled: Boolean,
+    onOpenInSpotify: (Song) -> Unit,
     onReset: () -> Unit
 ) {
     val topRecommendation = result.topRecommendation
@@ -116,6 +118,27 @@ fun RecommendationCard(
                         "Text encoder",
                         if (isModelBackedEncoder) encoderLabel else "$encoderLabel (fallback)"
                     )
+                    Button(
+                        onClick = { onOpenInSpotify(topRecommendation) },
+                        enabled = isSpotifyActionEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1DB954),
+                            contentColor = Color.Black,
+                            disabledContainerColor = Zinc800,
+                            disabledContentColor = Zinc400
+                        )
+                    ) {
+                        Text("Open in Spotify", fontWeight = FontWeight.SemiBold)
+                    }
+                    if (!isSpotifyActionEnabled) {
+                        Text(
+                            text = "Spotify is unavailable while offline.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Zinc400
+                        )
+                    }
                 }
             }
 
