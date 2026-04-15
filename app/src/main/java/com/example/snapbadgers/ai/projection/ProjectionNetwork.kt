@@ -1,48 +1,52 @@
 package com.example.snapbadgers.ai.projection
 
+import android.content.Context
 import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
-import kotlin.math.sqrt
+import org.tensorflow.lite.Interpreter
+import java.io.FileInputStream
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 
 /**
  * ProjectionNetwork
  *
- * Maps the 128-d fused context embedding into the song embedding space
- * so that cosine similarity against song embeddings is meaningful.
+ * Maps the 128-d fused context embedding (output of FusionEngine) into the
+ * song embedding space so that cosine similarity against pre-computed song
+ * embeddings is meaningful.
  *
- * Architecture:
- *   Input:  128-d fused context embedding (output of FusionEngine)
+ * Architecture (baked into projection_net.tflite):
+ *   Input:  128-d fused context embedding
  *   Hidden: 128 units, ReLU activation
  *   Output: 128-d projected embedding, L2-normalized
  *
- * The output feeds directly into SongRepository.findTopSongs() which
- * applies alignToEmbeddingDimension (salt=101) then cosine similarity
- * against pre-computed 128-d song embeddings.
- *
- * Weights are He-initialized for demonstration. In production, replace
- * initWeights() with loadWeights() using weights trained on
- * (fused embedding → target song embedding) pairs with a similarity loss.
+ * Inference runs on the Snapdragon NPU via the NNAPI delegate with CPU
+ * fallback. The compiled .tflite asset is produced by:
+ *   1. Training the MLP in PyTorch with cosine similarity loss
+ *   2. Exporting to ONNX (opset 17)
+ *   3. Compiling via Qualcomm AI Hub → downloads projection_net.tflite
+ *   4. Placing projection_net.tflite in app/src/main/assets/
  *
  * Usage:
- *   val projectionNetwork = ProjectionNetwork()
+ *   val projectionNetwork = ProjectionNetwork(context)
  *   val projected = projectionNetwork.project(fusedEmbedding) // 128-d
+ *   // ...
+ *   projectionNetwork.close()
  */
 class ProjectionNetwork(
+    context: Context,
     private val inputDim: Int = EMBEDDING_DIMENSION,   // 128
-    private val hiddenDim: Int = EMBEDDING_DIMENSION,  // 128
-    private val outputDim: Int = EMBEDDING_DIMENSION   // 128
+    private val outputDim: Int = EMBEDDING_DIMENSION,  // 128
+    assetFileName: String = "projection_net.tflite"
 ) {
-
-    // Layer 1: [hiddenDim x inputDim]
-    private val w1: Array<FloatArray> = Array(hiddenDim) { FloatArray(inputDim) }
-    private val b1: FloatArray = FloatArray(hiddenDim)
-
-    // Layer 2: [outputDim x hiddenDim]
-    private val w2: Array<FloatArray> = Array(outputDim) { FloatArray(hiddenDim) }
-    private val b2: FloatArray = FloatArray(outputDim)
+    private val interpreter: Interpreter
 
     init {
-        initWeights()
+        val opts = Interpreter.Options().apply {
+            useNNAPI = true                      // route to Snapdragon NPU
+            setAllowFp16PrecisionForFp32(true)   // fp16 where safe for speed
+        }
+        interpreter = Interpreter(loadModelFile(context, assetFileName), opts)
     }
 
     // ------------------------------------------------------------------
@@ -52,101 +56,69 @@ class ProjectionNetwork(
     /**
      * Projects a fused context embedding into the song embedding space.
      *
+     * L2 normalization is baked into the .tflite model as the final op,
+     * so the returned vector is already a unit vector — do not normalize again.
+     *
      * @param fusedEmbedding 128-d output from FusionEngine
-     * @return 128-d L2-normalized projected embedding ready for song ranking
+     * @return 128-d L2-normalized projected embedding, ready for
+     *         SongRepository.findTopSongs()
      */
     fun project(fusedEmbedding: FloatArray): FloatArray {
         require(fusedEmbedding.size == inputDim) {
             "Expected $inputDim-d input, got ${fusedEmbedding.size}-d. " +
             "Make sure FusionEngine output is passed directly."
         }
-        return mlpForward(fusedEmbedding)
+        val input  = Array(1) { fusedEmbedding }
+        val output = Array(1) { FloatArray(outputDim) }
+        interpreter.run(input, output)
+        return output[0]
     }
 
+    /**
+     * Release the interpreter and NPU resources.
+     * Call this when the enclosing ViewModel or component is destroyed.
+     */
+    fun close() = interpreter.close()
+
     // ------------------------------------------------------------------
-    // Weight loading
+    // Sanity check (call once during init/debug to verify the asset)
     // ------------------------------------------------------------------
 
     /**
-     * Load trained projection weights from flat float arrays.
+     * Verifies that the loaded model produces a correctly shaped,
+     * L2-normalized output. Logs a warning if normalization is off.
      *
-     * Expected sizes:
-     *   w1Flat: hiddenDim * inputDim  = 128 * 128 = 16,384
-     *   b1Flat: hiddenDim             = 128
-     *   w2Flat: outputDim * hiddenDim = 128 * 128 = 16,384
-     *   b2Flat: outputDim             = 128
-     *
-     * In production: load these from a trained .bin asset file.
-     * Train using (fusedEmbedding, targetSongEmbedding) pairs
-     * with cosine similarity loss.
+     * Safe to call in a debug build or during ViewModel init:
+     *   projectionNetwork.runSanityCheck()
      */
-    fun loadWeights(
-        w1Flat: FloatArray,
-        b1Flat: FloatArray,
-        w2Flat: FloatArray,
-        b2Flat: FloatArray
-    ) {
-        require(w1Flat.size == hiddenDim * inputDim) { "w1 size mismatch" }
-        require(b1Flat.size == hiddenDim)            { "b1 size mismatch" }
-        require(w2Flat.size == outputDim * hiddenDim) { "w2 size mismatch" }
-        require(b2Flat.size == outputDim)            { "b2 size mismatch" }
+    fun runSanityCheck() {
+        val fakeInput = FloatArray(inputDim) { 0.5f }
+        val result = project(fakeInput)
 
-        for (i in 0 until hiddenDim)
-            for (j in 0 until inputDim)
-                w1[i][j] = w1Flat[i * inputDim + j]
-        b1Flat.copyInto(b1)
+        check(result.size == outputDim) {
+            "Sanity check FAILED: output size ${result.size}, expected $outputDim"
+        }
 
-        for (i in 0 until outputDim)
-            for (j in 0 until hiddenDim)
-                w2[i][j] = w2Flat[i * hiddenDim + j]
-        b2Flat.copyInto(b2)
+        val norm = Math.sqrt(result.map { it * it.toDouble() }.sum())
+        if (norm !in 0.99..1.01) {
+            android.util.Log.w(
+                "ProjectionNetwork",
+                "Output vector is not unit-normalized (norm=$norm). " +
+                "If L2 norm is not baked into the .tflite, wrap output[0] " +
+                "with VectorUtils.normalize() inside project()."
+            )
+        } else {
+            android.util.Log.d("ProjectionNetwork", "Sanity check passed. Norm=$norm")
+        }
     }
 
     // ------------------------------------------------------------------
     // Private helpers
     // ------------------------------------------------------------------
 
-    /** 2-layer MLP: Linear → ReLU → Linear → L2Norm */
-    private fun mlpForward(input: FloatArray): FloatArray {
-        // Layer 1: linear + ReLU
-        val hidden = FloatArray(hiddenDim)
-        for (i in 0 until hiddenDim) {
-            var sum = b1[i]
-            for (j in 0 until inputDim) sum += w1[i][j] * input[j]
-            hidden[i] = relu(sum)
-        }
-
-        // Layer 2: linear
-        val output = FloatArray(outputDim)
-        for (i in 0 until outputDim) {
-            var sum = b2[i]
-            for (j in 0 until hiddenDim) sum += w2[i][j] * hidden[j]
-            output[i] = sum
-        }
-
-        return VectorUtils.normalize(output)
-    }
-
-    private fun relu(x: Float) = if (x > 0f) x else 0f
-
-    /**
-     * He initialization — good default for ReLU networks.
-     * Replace with loadWeights() once trained weights are available.
-     */
-    private fun initWeights() {
-        val rng = java.util.Random(42)
-        val scale1 = sqrt(2.0 / inputDim).toFloat()
-        val scale2 = sqrt(2.0 / hiddenDim).toFloat()
-
-        for (i in 0 until hiddenDim) {
-            b1[i] = 0f
-            for (j in 0 until inputDim)
-                w1[i][j] = rng.nextGaussian().toFloat() * scale1
-        }
-        for (i in 0 until outputDim) {
-            b2[i] = 0f
-            for (j in 0 until hiddenDim)
-                w2[i][j] = rng.nextGaussian().toFloat() * scale2
-        }
+    private fun loadModelFile(context: Context, assetName: String): MappedByteBuffer {
+        val afd = context.assets.openFd(assetName)
+        return FileInputStream(afd.fileDescriptor).channel
+            .map(FileChannel.MapMode.READ_ONLY, afd.startOffset, afd.declaredLength)
     }
 }

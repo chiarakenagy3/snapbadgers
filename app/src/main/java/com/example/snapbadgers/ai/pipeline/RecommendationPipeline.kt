@@ -41,7 +41,7 @@ class RecommendationPipeline(
     private val sensorEncoder     = SensorEncoder()
     private val visionEncoder     = VisionEncoder(appContext)  
     private val fusionEngine      = FusionEngine()
-    private val projectionNetwork = ProjectionNetwork()        
+    private val projectionNetwork = ProjectionNetwork(appContext)
 
     val textEncoderLabel: String
         get() = textEncoder?.label ?: textEncoderDescriptor.label
@@ -98,8 +98,15 @@ class RecommendationPipeline(
             onStepUpdate(steps)
 
             // Step 5: Projection → map fused embedding into song embedding space
+            // Skip projection when using heuristic encoder — the MLP was trained on
+            // model-backed encoder outputs, and sample song embeddings are also in
+            // heuristic space, so both sides must stay in the same space.
             delay(120)
-            val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
+            val projectedEmbedding = if (useHeuristicTextEncoder) {
+                fusedEmbedding
+            } else {
+                projectionNetwork.project(fusedEmbedding)
+            }
             steps = steps.copy(projected = true)
             onStepUpdate(steps)
 

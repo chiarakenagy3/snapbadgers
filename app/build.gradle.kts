@@ -111,4 +111,8 @@ tasks.withType<Test>().configureEach {
         testClassesDirs = files(testClassesDirs, kotlinUnitTestClasses)
         classpath = classpath.plus(kotlinUnitTestClasses)
     }
+    testLogging {
+        events("passed", "failed", "skipped")
+        showStandardStreams = true
+    }
 }
