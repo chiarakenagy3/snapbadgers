@@ -28,7 +28,7 @@ class UiStateTest {
     fun `UiState Success contains result`() {
         val result = RecommendationResult(
             recommendations = listOf(
-                Song("Title", "Artist", FloatArray(128))
+                Song("Title", "Artist", 0f, 0L, FloatArray(128))
             ),
             inferenceTimeMs = 100L,
             usedVisionInput = false

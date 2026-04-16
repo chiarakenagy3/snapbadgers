@@ -37,8 +37,10 @@ class SensorEncoderTest {
         val sample = SensorSample(accelX = 0f, accelY = 0f, accelZ = 0f, light = 0f)
         val result = encoder.encode(sample)
         assertEquals(EMBEDDING_DIMENSION, result.size)
-        // Zero accel and zero light yields zero raw features, so output should be zero
-        assertTrue(result.all { it == 0f })
+        // Even with 0 lux, IDX_ACOUSTICNESS is set to (1.0 - 0.0) = 1.0
+        // So the vector should NOT be all zeros.
+        val norm = l2Norm(result)
+        assertTrue("Vector should be normalized even with zero inputs", norm in 0.999f..1.001f)
     }
 
     @Test

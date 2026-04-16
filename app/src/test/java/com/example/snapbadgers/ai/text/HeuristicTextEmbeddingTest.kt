@@ -33,11 +33,13 @@ class HeuristicTextEmbeddingTest {
         val study = HeuristicTextEmbedding.encode("study session")
         val happy = HeuristicTextEmbedding.encode("happy vibes")
 
-        // Before normalization these slots would be 1.0; after normalization they
-        // should still be the largest contributor in their respective dimension
-        assertTrue("calm keyword should activate index 2", calm[2] > 0f)
-        assertTrue("study keyword should activate index 3", study[3] > 0f)
-        assertTrue("happy keyword should activate index 4", happy[4] > 0f)
+        // Indices are defined in VectorUtils.kt: 
+        // IDX_ACOUSTICNESS = 3
+        // IDX_INSTRUMENTALNESS = 4
+        // IDX_VALENCE = 6
+        assertTrue("calm keyword should activate acousticness", calm[3] > 0f)
+        assertTrue("study keyword should activate instrumentalness", study[4] > 0f)
+        assertTrue("happy keyword should activate valence", happy[6] > 0f)
     }
 
     @Test
