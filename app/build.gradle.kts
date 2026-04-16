@@ -94,7 +94,6 @@ dependencies {
 
     implementation(libs.tensorflow.lite)
     implementation(libs.tensorflow.lite.support)
-    implementation(libs.litert)
 
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
