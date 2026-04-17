@@ -1,6 +1,7 @@
 package com.example.snapbadgers.songembeddings.network
 
 import com.example.snapbadgers.songembeddings.model.AudioFeatures
+import com.google.gson.annotations.SerializedName
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
@@ -8,10 +9,10 @@ import retrofit2.http.Query
 
 data class Artist(val name: String)
 data class Track(
-    val id: String, 
-    val name: String, 
+    val id: String,
+    val name: String,
     val artists: List<Artist>,
-    val preview_url: String?
+    @SerializedName("preview_url") val previewUrl: String?
 )
 data class TopTracksResponse(val items: List<Track>)
 data class SearchResponse(val tracks: SearchTracksContainer)

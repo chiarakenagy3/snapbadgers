@@ -10,9 +10,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * End-to-end recommendation tests with realistic user scenarios.
- */
 @RunWith(AndroidJUnit4::class)
 class EndToEndRecommendationTest {
 
@@ -22,247 +19,103 @@ class EndToEndRecommendationTest {
     @Before
     fun setup() {
         pipeline = RecommendationPipeline(context)
-        // Warmup
-        runBlocking {
-            pipeline.warmUp()
-        }
+        runBlocking { pipeline.warmUp() }
     }
 
     @Test
-    fun testCalmNightScenario() = runBlocking {
-        println("\n🌙 Scenario: Calm Night Study Session")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "calm peaceful night music for studying and focusing",
-            onStepUpdate = {}
-        )
-
-        println("  Query: 'calm peaceful night...'")
-        println("  Inference time: ${result.inferenceTimeMs}ms")
-        println("  Recommendations:")
-        result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist} (${("%.3f".format(song.similarity))})")
+    fun testTextOnlyScenarios() = runBlocking {
+        mapOf(
+            "calm peaceful night music for studying and focusing" to "Calm Night",
+            "high energy workout pump up beats fast tempo" to "Workout",
+            "gentle morning coffee jazz acoustic" to "Morning Coffee",
+            "upbeat party dance happy celebration" to "Party Mood",
+            "meditation mindfulness calm peaceful zen" to "Meditation",
+            "driving commute road trip upbeat" to "Commute Driving"
+        ).forEach { (query, label) ->
+            println("EVAL Scenario: $label")
+            val result = pipeline.runPipeline(input = query, onStepUpdate = {})
+            println("  Inference time: ${result.inferenceTimeMs}ms")
+            result.recommendations.forEach { song ->
+                println("    - ${song.title} by ${song.artist} (${"%.3f".format(song.similarity)})")
+            }
+            assertTrue("$label should return recommendations", result.recommendations.isNotEmpty())
+            assertTrue("$label should complete in reasonable time", result.inferenceTimeMs < 5000)
         }
-        println("━".repeat(60))
-
-        assertTrue("Should return recommendations", result.recommendations.isNotEmpty())
-        assertTrue("Should complete in reasonable time", result.inferenceTimeMs < 5000)
-    }
-
-    @Test
-    fun testEnergeticWorkoutScenario() = runBlocking {
-        println("\n💪 Scenario: Energetic Workout Session")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "high energy workout pump up beats fast tempo",
-            onStepUpdate = {}
-        )
-
-        println("  Query: 'high energy workout...'")
-        println("  Recommendations:")
-        result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist}")
-        }
-        println("━".repeat(60))
-
-        assertTrue(result.recommendations.isNotEmpty())
-    }
-
-    @Test
-    fun testMorningCoffeeScenario() = runBlocking {
-        println("\n☕ Scenario: Morning Coffee Relaxation")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "gentle morning coffee jazz acoustic",
-            onStepUpdate = {}
-        )
-
-        println("  Recommendations:")
-        result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist}")
-        }
-        println("━".repeat(60))
-
-        assertTrue(result.recommendations.isNotEmpty())
     }
 
     @Test
     fun testLateNightCodingScenario() = runBlocking {
-        println("\n💻 Scenario: Late Night Coding")
-        println("━".repeat(60))
-
+        println("EVAL Scenario: Late Night Coding")
         val bitmap = createDarkAmbientSceneBitmap()
-
         val result = pipeline.runPipeline(
             input = "late night coding focus ambient electronic",
             imageBitmap = bitmap,
             onStepUpdate = {}
         )
-
-        println("  Query: 'late night coding...' + dark ambient image")
         println("  Used vision: ${result.usedVisionInput}")
-        println("  Recommendations:")
         result.recommendations.forEach { song ->
             println("    - ${song.title} by ${song.artist}")
         }
-        println("━".repeat(60))
-
         assertTrue(result.usedVisionInput)
         assertTrue(result.recommendations.isNotEmpty())
     }
 
     @Test
-    fun testPartyMoodScenario() = runBlocking {
-        println("\n🎉 Scenario: Party Mood")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "upbeat party dance happy celebration",
-            onStepUpdate = {}
-        )
-
-        println("  Recommendations:")
-        result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist}")
-        }
-        println("━".repeat(60))
-
-        assertTrue(result.recommendations.isNotEmpty())
-    }
-
-    @Test
-    fun testMeditationScenario() = runBlocking {
-        println("\n🧘 Scenario: Meditation Session")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "meditation mindfulness calm peaceful zen",
-            onStepUpdate = {}
-        )
-
-        println("  Recommendations:")
-        result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist}")
-        }
-        println("━".repeat(60))
-
-        assertTrue(result.recommendations.isNotEmpty())
-    }
-
-    @Test
-    fun testCommuteDrivingScenario() = runBlocking {
-        println("\n🚗 Scenario: Commute Driving")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "driving commute road trip upbeat",
-            onStepUpdate = {}
-        )
-
-        println("  Recommendations:")
-        result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist}")
-        }
-        println("━".repeat(60))
-
-        assertTrue(result.recommendations.isNotEmpty())
-    }
-
-    @Test
     fun testRainyDayScenario() = runBlocking {
-        println("\n🌧️ Scenario: Rainy Day Indoors")
-        println("━".repeat(60))
-
+        println("EVAL Scenario: Rainy Day Indoors")
         val rainySceneBitmap = createRainySceneBitmap()
-
         val result = pipeline.runPipeline(
             input = "rainy day cozy indoor relaxing",
             imageBitmap = rainySceneBitmap,
             onStepUpdate = {}
         )
-
         println("  Used vision: ${result.usedVisionInput}")
-        println("  Recommendations:")
         result.recommendations.forEach { song ->
             println("    - ${song.title} by ${song.artist}")
         }
-        println("━".repeat(60))
-
         assertTrue(result.recommendations.isNotEmpty())
     }
 
     @Test
     fun testMinimalInputScenario() = runBlocking {
-        println("\n📝 Scenario: Minimal Input")
-        println("━".repeat(60))
-
-        val result = pipeline.runPipeline(
-            input = "calm",
-            onStepUpdate = {}
-        )
-
-        println("  Query: 'calm'")
-        println("  Recommendations:")
+        println("EVAL Scenario: Minimal Input")
+        val result = pipeline.runPipeline(input = "calm", onStepUpdate = {})
         result.recommendations.forEach { song ->
             println("    - ${song.title} by ${song.artist}")
         }
-        println("━".repeat(60))
-
         assertTrue("Should handle single word", result.recommendations.isNotEmpty())
     }
 
     @Test
     fun testDetailedInputScenario() = runBlocking {
-        println("\n📚 Scenario: Detailed Description")
-        println("━".repeat(60))
-
+        println("EVAL Scenario: Detailed Description")
         val detailedInput = """
             I'm looking for calm, peaceful ambient music with a slow tempo
             that would be perfect for late night studying. Something electronic
             or instrumental without vocals that helps with focus and concentration.
         """.trimIndent()
 
-        val result = pipeline.runPipeline(
-            input = detailedInput,
-            onStepUpdate = {}
-        )
-
+        val result = pipeline.runPipeline(input = detailedInput, onStepUpdate = {})
         println("  Query length: ${detailedInput.length} chars")
-        println("  Recommendations:")
         result.recommendations.forEach { song ->
             println("    - ${song.title} by ${song.artist}")
         }
-        println("━".repeat(60))
-
         assertTrue("Should handle detailed input", result.recommendations.isNotEmpty())
     }
 
     @Test
     fun testMultipleModalitiesScenario() = runBlocking {
-        println("\n🎨 Scenario: Full Multimodal Input")
-        println("━".repeat(60))
-
+        println("EVAL Scenario: Full Multimodal Input")
         val sceneBitmap = createColorfulSceneBitmap()
-
         val result = pipeline.runPipeline(
             input = "energetic colorful upbeat happy",
             imageBitmap = sceneBitmap,
             onStepUpdate = {}
         )
-
-        println("  Text: 'energetic colorful...'")
-        println("  Vision: Colorful scene")
-        println("  Sensors: Active")
         println("  Used vision: ${result.usedVisionInput}")
-        println("  Recommendations:")
         result.recommendations.forEach { song ->
-            println("    - ${song.title} by ${song.artist} (${("%.3f".format(song.similarity))})")
+            println("    - ${song.title} by ${song.artist} (${"%.3f".format(song.similarity)})")
         }
-        println("━".repeat(60))
-
         assertTrue(result.usedVisionInput)
         assertTrue(result.recommendations.isNotEmpty())
         assertEquals(3, result.recommendations.size)
@@ -270,41 +123,26 @@ class EndToEndRecommendationTest {
 
     @Test
     fun testRecommendationQualityMetrics() = runBlocking {
-        println("\n📊 Recommendation Quality Metrics")
-        println("━".repeat(60))
-
-        val queries = listOf(
-            "calm music",
-            "energetic workout",
-            "peaceful meditation",
-            "upbeat party"
-        )
+        println("EVAL Recommendation Quality Metrics")
+        val queries = listOf("calm music", "energetic workout", "peaceful meditation", "upbeat party")
 
         queries.forEach { query ->
             val result = pipeline.runPipeline(query, onStepUpdate = {})
-
-            println("  Query: '$query'")
-            println("    Recommendations: ${result.recommendations.size}")
-            println("    Inference time: ${result.inferenceTimeMs}ms")
+            println("  Query: '$query' -> ${result.recommendations.size} recs, ${result.inferenceTimeMs}ms")
             println("    Top similarity: ${"%.3f".format(result.recommendations.firstOrNull()?.similarity ?: 0f)}")
 
-            // Quality checks
             assertTrue("Should have recommendations", result.recommendations.isNotEmpty())
             assertTrue("Should complete quickly", result.inferenceTimeMs < 3000)
-
             result.recommendations.forEach { song ->
                 assertTrue("Similarity should be valid", song.similarity >= 0f && song.similarity <= 1f)
                 assertTrue("Title should not be empty", song.title.isNotBlank())
                 assertTrue("Artist should not be empty", song.artist.isNotBlank())
             }
         }
-
-        println("━".repeat(60))
     }
 
     private fun createDarkAmbientSceneBitmap(): Bitmap {
         return Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888).apply {
-            // Dark blue/purple gradient
             for (y in 0 until 224) {
                 for (x in 0 until 224) {
                     val blue = ((y * 128 / 224) + 64).coerceIn(0, 255)
@@ -316,7 +154,6 @@ class EndToEndRecommendationTest {
 
     private fun createRainySceneBitmap(): Bitmap {
         return Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888).apply {
-            // Gray/blue tones
             for (y in 0 until 224) {
                 for (x in 0 until 224) {
                     val gray = 100 + (x + y) % 50
@@ -328,7 +165,6 @@ class EndToEndRecommendationTest {
 
     private fun createColorfulSceneBitmap(): Bitmap {
         return Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888).apply {
-            // Vibrant colors
             for (y in 0 until 224) {
                 for (x in 0 until 224) {
                     val r = (x * 255 / 224).coerceIn(0, 255)

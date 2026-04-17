@@ -4,8 +4,6 @@ import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 
 /**
- * FusionEngine
- *
  * Merges scene (vision) + text + sensor embeddings into a single
  * 128-d fused context embedding using weighted averaging + L2 normalization.
  *
@@ -13,9 +11,6 @@ import com.example.snapbadgers.ai.common.ml.VectorUtils
  *   vision = 0.60 — scene is the primary signal (what you see drives the vibe)
  *   text   = 0.25 — user query refines the scene context
  *   sensor = 0.15 — motion/light/time adds supplementary context
- *
- * All three encoders now output proper 128-d vectors so alignToEmbeddingDimension
- * is effectively a no-op (passes through with normalization only).
  */
 class FusionEngine(
     private val visionWeight: Float = 0.60f,

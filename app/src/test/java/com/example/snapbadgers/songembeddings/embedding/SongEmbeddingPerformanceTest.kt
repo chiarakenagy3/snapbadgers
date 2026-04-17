@@ -21,7 +21,7 @@ class SongEmbeddingPerformanceTest {
             loudness = -7.5f,
             key = 7,
             mode = 1,
-            duration_ms = 202_000f
+            durationMs = 202_000f
         )
 
         val warmupRuns = 300
