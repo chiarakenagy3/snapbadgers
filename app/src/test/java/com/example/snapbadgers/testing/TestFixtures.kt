@@ -114,7 +114,7 @@ object TestFixtures {
         valence: Float = 0.5f,
         tempo: Float = 120f,
         loudness: Float = -5f,
-        duration_ms: Float = 200000f
+        duration_ms: Int = 200000
     ) = AudioFeatures(
         id = id,
         danceability = danceability,
@@ -128,7 +128,8 @@ object TestFixtures {
         liveness = liveness,
         valence = valence,
         tempo = tempo,
-        duration_ms = duration_ms
+        duration_ms = duration_ms,
+        time_signature = 4
     )
 
     fun createCalmAudioFeatures() = createTestAudioFeatures(
@@ -218,13 +219,7 @@ class SongBuilder {
     fun withEmbedding(embedding: FloatArray) = apply { this.embedding = embedding }
     fun withSimilarity(similarity: Float) = apply { this.similarity = similarity }
 
-    fun build() = Song(
-        title = title,
-        artist = artist,
-        similarity = similarity,
-        inferenceTimeMs = 0L,
-        embedding = embedding
-    )
+    fun build() = Song(title, artist, embedding, similarity)
 }
 
 /**

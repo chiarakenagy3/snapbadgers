@@ -26,7 +26,7 @@ class EmbeddingUtilsTest {
             energy = 0.9f,
             tempo = 120f,
             loudness = -5f,
-            duration_ms = 200000f
+            duration_ms = 200000
         )
 
         val base = buildBaseVector(features)
@@ -52,7 +52,7 @@ class EmbeddingUtilsTest {
 
     @Test
     fun `buildBaseVector handles very long duration`() {
-        val features = createTestAudioFeatures(duration_ms = 600000f)  // 10 minutes
+        val features = createTestAudioFeatures(duration_ms = 600000)  // 10 minutes
         val base = buildBaseVector(features)
 
         assertTrue("Duration clamped to max", base[9] <= 2f)
@@ -302,7 +302,7 @@ class EmbeddingUtilsTest {
             createTestAudioFeatures(danceability = 1f, energy = 1f),
             createTestAudioFeatures(tempo = 0f),
             createTestAudioFeatures(loudness = -60f),  // Very quiet
-            createTestAudioFeatures(duration_ms = 1000f)  // Very short
+            createTestAudioFeatures(duration_ms = 1000)  // Very short
         )
 
         edgeCases.forEach { features ->
@@ -362,7 +362,7 @@ class EmbeddingUtilsTest {
         valence: Float = 0.5f,
         tempo: Float = 120f,
         loudness: Float = -5f,
-        duration_ms: Float = 200000f
+        duration_ms: Int = 200000
     ) = AudioFeatures(
         id = "test_track",
         danceability = danceability,
@@ -376,6 +376,7 @@ class EmbeddingUtilsTest {
         liveness = liveness,
         valence = valence,
         tempo = tempo,
-        duration_ms = duration_ms
+        duration_ms = duration_ms,
+        time_signature = 4
     )
 }
