@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
+import com.example.snapbadgers.ui.i18n.AppStrings
 import com.example.snapbadgers.ui.theme.Zinc400
 import com.example.snapbadgers.ui.theme.Zinc700
 
@@ -34,6 +36,7 @@ import com.example.snapbadgers.ui.theme.Zinc700
 fun CameraInputCard(
     capturedBitmap: Bitmap?,
     enabled: Boolean,
+    strings: AppStrings,
     onBitmapCaptured: (Bitmap?) -> Unit
 ) {
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -54,18 +57,14 @@ fun CameraInputCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Camera photo",
+                text = strings.cameraPhoto,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
-                text = if (capturedBitmap == null) {
-                    "Capture an optional photo to blend visual context into the recommendation."
-                } else {
-                    "A photo is attached and will be fused with text and sensor input."
-                },
+                text = if (capturedBitmap == null) strings.cameraHint else strings.cameraAttachedHint,
                 style = MaterialTheme.typography.bodySmall,
                 color = Zinc400
             )
@@ -83,7 +82,7 @@ fun CameraInputCard(
                         contentColor = Color.Black
                     )
                 ) {
-                    Text(if (capturedBitmap == null) "Capture Photo" else "Retake Photo")
+                    Text(if (capturedBitmap == null) strings.capturePhoto else strings.retakePhoto)
                 }
 
                 OutlinedButton(
@@ -92,14 +91,15 @@ fun CameraInputCard(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Zinc400)
                 ) {
-                    Text("Clear Photo")
+                    Text(strings.clearPhoto)
                 }
             }
 
             if (capturedBitmap != null) {
+                val imageBitmap = remember(capturedBitmap) { capturedBitmap.asImageBitmap() }
                 Image(
-                    bitmap = capturedBitmap.asImageBitmap(),
-                    contentDescription = "Captured camera photo",
+                    bitmap = imageBitmap,
+                    contentDescription = strings.cameraPhoto,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(220.dp)

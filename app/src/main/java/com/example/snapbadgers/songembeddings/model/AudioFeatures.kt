@@ -15,5 +15,5 @@ data class AudioFeatures(
     val loudness: Float,
     val key: Int,
     val mode: Int,
-    @SerializedName("duration_ms") val duration_ms: Float = 240000f
+    @SerializedName("duration_ms") val durationMs: Float = 240000f
 )

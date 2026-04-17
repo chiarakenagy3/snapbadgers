@@ -27,20 +27,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.Song
-import com.example.snapbadgers.ui.i18n.AppI18n
+import com.example.snapbadgers.ui.i18n.AppStrings
 import com.example.snapbadgers.ui.theme.Zinc400
 import com.example.snapbadgers.ui.theme.Zinc500
 import com.example.snapbadgers.ui.theme.Zinc800
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.remember
 
 @Composable
-fun LibraryScreen(songs: List<Song>, language: String) {
-    val strings = AppI18n.forLanguage(language)
+fun LibraryScreen(songs: List<Song>, strings: AppStrings) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -65,7 +66,7 @@ fun LibraryScreen(songs: List<Song>, language: String) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(songs) { song ->
+                items(songs, key = { "${it.title}-${it.artist}" }) { song ->
                     SongItem(song)
                 }
             }
@@ -74,8 +75,7 @@ fun LibraryScreen(songs: List<Song>, language: String) {
 }
 
 @Composable
-fun HistoryScreen(history: List<HistoryItem>, language: String) {
-    val strings = AppI18n.forLanguage(language)
+fun HistoryScreen(history: List<HistoryItem>, strings: AppStrings) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -100,7 +100,7 @@ fun HistoryScreen(history: List<HistoryItem>, language: String) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(history) { item ->
+                items(history, key = { it.id }) { item ->
                     HistoryCard(item)
                 }
             }
@@ -126,17 +126,21 @@ private fun SongItem(song: Song) {
                 tint = Zinc400,
                 modifier = Modifier.size(24.dp)
             )
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = song.artist,
                     color = Zinc500,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -145,8 +149,8 @@ private fun SongItem(song: Song) {
 
 @Composable
 private fun HistoryCard(item: HistoryItem) {
-    val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
-    val dateString = dateFormat.format(Date(item.timestamp))
+    val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
+    val dateString = remember(item.timestamp) { dateFormat.format(Date(item.timestamp)) }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -179,7 +183,9 @@ private fun HistoryCard(item: HistoryItem) {
                 text = "\"${item.query}\"",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
-                fontSize = 16.sp
+                fontSize = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
             item.result.topRecommendation?.let { song ->
@@ -196,17 +202,21 @@ private fun HistoryCard(item: HistoryItem) {
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp
                     )
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = song.title,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = song.artist,
                             color = Zinc400,
-                            fontSize = 12.sp
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

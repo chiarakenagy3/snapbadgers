@@ -19,10 +19,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.data.SettingsRepository
@@ -41,7 +43,7 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
     val language = settingsRepository.language.value
     val notificationsEnabled = settingsRepository.notificationsEnabled.value
     val personalizationEnabled = settingsRepository.personalizationEnabled.value
-    val strings = AppI18n.forLanguage(language)
+    val strings = remember(language) { AppI18n.forLanguage(language) }
 
     Column(
         modifier = Modifier
@@ -81,21 +83,23 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
             )
         }
 
+        val themeOptions = remember { listOf("System", "Dark", "Light") }
         SettingsSection(title = strings.appearance) {
             SettingsOptionSelector(
                 label = strings.theme,
                 description = "Choose app brightness and color preference",
-                options = listOf("System", "Dark", "Light"),
+                options = themeOptions,
                 selectedOption = themeMode,
                 onOptionSelected = { settingsRepository.updateThemeMode(it) }
             )
         }
 
+        val languageOptions = remember { listOf("English", "Chinese", "Spanish") }
         SettingsSection(title = strings.language) {
             SettingsOptionSelector(
                 label = strings.language,
                 description = "Set your preferred display language",
-                options = listOf("English", "Chinese", "Spanish"),
+                options = languageOptions,
                 selectedOption = language,
                 onOptionSelected = { settingsRepository.updateLanguage(it) }
             )
@@ -213,7 +217,10 @@ private fun SettingsOptionSelector(
                 ) {
                     Text(
                         text = option,
-                        modifier = Modifier.padding(vertical = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp),
+                        textAlign = TextAlign.Center,
                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium

@@ -2,6 +2,7 @@ package com.example.snapbadgers.ai.text.ml
 
 import android.content.Context
 import android.util.Log
+import com.example.snapbadgers.ai.common.EncoderUtils
 import com.example.snapbadgers.ai.common.ml.EMBEDDING_DIMENSION
 import com.example.snapbadgers.ai.common.ml.VectorUtils
 import com.example.snapbadgers.ai.text.TextEncoder
@@ -14,6 +15,16 @@ import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/**
+ * Text encoder backed by MobileBERT, running on-device via TFLite.
+ *
+ * Delegate strategy: attempts NNAPI first for NPU/DSP acceleration, falls back to
+ * CPU-only XNNPack if NNAPI is unavailable or fails.
+ *
+ * NOTE: [NnApiDelegate] is deprecated starting Android 15 (SDK 35). The recommended
+ * migration path is QNN delegate → GPU delegate → XNNPack. QNN requires the
+ * Qualcomm AI Engine Direct SDK which is not yet stable for general use.
+ */
 class QualcommTextEncoder(
     private val context: Context,
     private val tokenizer: Tokenizer,
@@ -29,14 +40,25 @@ class QualcommTextEncoder(
     private val inputMaxLength = 128
     private val outputDimension = EMBEDDING_DIMENSION
 
+    private val inputBuffer = ByteBuffer.allocateDirect(inputMaxLength * 4).apply {
+        order(ByteOrder.nativeOrder())
+    }
+
     private fun initializeInterpreter() {
         if (interpreter != null) return
 
-        val options = Interpreter.Options()
-        nnApiDelegate = NnApiDelegate()
-        options.addDelegate(nnApiDelegate)
-
         val modelBuffer = ModelLoader.loadMappedFile(context, modelPath)
+        val options = Interpreter.Options()
+
+        try {
+            nnApiDelegate = NnApiDelegate()
+            options.addDelegate(nnApiDelegate)
+        } catch (e: Throwable) {
+            EncoderUtils.logWarning(TAG, "NNAPI delegate unavailable, falling back to CPU", e)
+            nnApiDelegate?.close()
+            nnApiDelegate = null
+        }
+
         val currentInterpreter = Interpreter(modelBuffer, options)
         require(currentInterpreter.inputTensorCount == EXPECTED_INPUT_TENSOR_COUNT) {
             "Unsupported text model signature: expected $EXPECTED_INPUT_TENSOR_COUNT input tensor, found ${currentInterpreter.inputTensorCount}"
@@ -62,9 +84,7 @@ class QualcommTextEncoder(
             initializeInterpreter()
             val tokens = tokenizer.tokenize(text)
 
-            val inputBuffer = ByteBuffer.allocateDirect(inputMaxLength * 4).apply {
-                order(ByteOrder.nativeOrder())
-            }
+            inputBuffer.clear()
 
             for (index in 0 until inputMaxLength) {
                 if (index < tokens.size) {
@@ -79,7 +99,7 @@ class QualcommTextEncoder(
             interpreter?.run(inputBuffer, outputBuffer)
             return@withContext VectorUtils.normalize(outputBuffer[0])
         } catch (exception: Exception) {
-            logWarning("Text model inference failed", exception)
+            EncoderUtils.logWarning(TAG, "Text model inference failed", exception)
             throw exception
         }
     }
@@ -87,19 +107,6 @@ class QualcommTextEncoder(
     override fun close() {
         interpreter?.close()
         nnApiDelegate?.close()
-    }
-
-    private fun logWarning(message: String, throwable: Throwable? = null) {
-        runCatching {
-            if (throwable == null) {
-                Log.w(TAG, message)
-            } else {
-                Log.w(TAG, message, throwable)
-            }
-        }.getOrElse {
-            val suffix = throwable?.let { ": ${it.message}" }.orEmpty()
-            System.err.println("$TAG: $message$suffix")
-        }
     }
 
     private companion object {
