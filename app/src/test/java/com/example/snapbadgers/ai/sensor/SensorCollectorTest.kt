@@ -3,11 +3,9 @@ package com.example.snapbadgers.ai.sensor
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorManager
-import android.hardware.SensorEventListener
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.*
 
 /**
@@ -27,23 +25,22 @@ class SensorCollectorTest {
         `when`(mockContext.getSystemService(Context.SENSOR_SERVICE)).thenReturn(mockSensorManager)
         `when`(mockContext.applicationContext).thenReturn(mockContext)
 
-        // Mock default sensors before creating the collector so it can initialize its fields
-        val mockAccel = mock(Sensor::class.java)
-        val mockLight = mock(Sensor::class.java)
-        `when`(mockSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)).thenReturn(mockAccel)
-        `when`(mockSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)).thenReturn(mockLight)
-
         collector = SensorCollector(mockContext)
     }
 
     @Test
     fun `start initializes sensor listeners`() {
-        // Mocking moved to setup() to ensure they are present during collector initialization
+        val mockAccel = mock(Sensor::class.java)
+        val mockLight = mock(Sensor::class.java)
+
+        `when`(mockSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)).thenReturn(mockAccel)
+        `when`(mockSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)).thenReturn(mockLight)
+
         collector.start()
 
         verify(mockSensorManager, atLeastOnce()).registerListener(
-            any(SensorEventListener::class.java),
-            any(Sensor::class.java),
+            any(),
+            any(),
             anyInt()
         )
     }
@@ -53,7 +50,7 @@ class SensorCollectorTest {
         collector.start()
         collector.stop()
 
-        verify(mockSensorManager).unregisterListener(any(SensorEventListener::class.java))
+        verify(mockSensorManager).unregisterListener(any())
     }
 
     @Test
@@ -114,46 +111,34 @@ class SensorCollectorTest {
 
     @Test
     fun `collector handles missing accelerometer gracefully`() {
-        // Re-create collector with missing sensor
-        val localMockContext = mock(Context::class.java)
-        val localMockSensorManager = mock(SensorManager::class.java)
-        `when`(localMockContext.getSystemService(Context.SENSOR_SERVICE)).thenReturn(localMockSensorManager)
-        `when`(localMockSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)).thenReturn(null)
-        
-        val localCollector = SensorCollector(localMockContext)
-        localCollector.start()
-        val sample = localCollector.getLatestSample()
+        `when`(mockSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)).thenReturn(null)
+
+        collector.start()
+        val sample = collector.getLatestSample()
 
         assertNotNull(sample)
+        // Should use default values
     }
 
     @Test
     fun `collector handles missing light sensor gracefully`() {
-        // Re-create collector with missing sensor
-        val localMockContext = mock(Context::class.java)
-        val localMockSensorManager = mock(SensorManager::class.java)
-        `when`(localMockContext.getSystemService(Context.SENSOR_SERVICE)).thenReturn(localMockSensorManager)
-        `when`(localMockSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)).thenReturn(null)
+        `when`(mockSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)).thenReturn(null)
 
-        val localCollector = SensorCollector(localMockContext)
-        localCollector.start()
-        val sample = localCollector.getLatestSample()
+        collector.start()
+        val sample = collector.getLatestSample()
 
         assertNotNull(sample)
+        // Light should be 0 or default value
     }
 
     @Test
     fun `collector handles all sensors missing`() {
-        // Re-create collector with no sensors
-        val localMockContext = mock(Context::class.java)
-        val localMockSensorManager = mock(SensorManager::class.java)
-        `when`(localMockContext.getSystemService(Context.SENSOR_SERVICE)).thenReturn(localMockSensorManager)
-        `when`(localMockSensorManager.getDefaultSensor(anyInt())).thenReturn(null)
+        `when`(mockSensorManager.getDefaultSensor(anyInt())).thenReturn(null)
 
-        val localCollector = SensorCollector(localMockContext)
-        localCollector.start()
-        val sample = localCollector.getLatestSample()
+        collector.start()
+        val sample = collector.getLatestSample()
 
         assertNotNull(sample)
+        // Should return safe defaults
     }
 }

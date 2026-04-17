@@ -15,7 +15,6 @@ mockitoKotlin = "5.2.1"
 androidxTestRunner = "1.7.0"
 androidxTestRules = "1.7.0"
 liteRtInterpreter = "1.4.1"
-kotlinxCoroutines = "1.7.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,7 +41,6 @@ tensorflow-lite-gpu = { group = "org.tensorflow", name = "tensorflow-lite-gpu", 
 tensorflow-lite-select-tf-ops = { group = "org.tensorflow", name = "tensorflow-lite-select-tf-ops", version.ref = "tensorflowLite" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockitoKotlin" }
-kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
