@@ -1,11 +1,8 @@
+# SnapBadgers
+
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-SDK_36-3DDC84?logo=android&logoColor=white)
 ![TFLite](https://img.shields.io/badge/TFLite-2.16-FF6F00?logo=tensorflow&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
-
-# SnapBadgers
-
-## Overview
 
 **SnapBadgers** is an Android application that recommends songs by fusing multimodal input -- a text query, an optional camera image, and live device sensor readings -- through a 6-stage on-device ML pipeline. All inference runs locally using TensorFlow Lite with NNAPI delegation for NPU acceleration on Qualcomm SoCs.
 
