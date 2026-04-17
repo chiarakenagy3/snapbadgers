@@ -36,9 +36,6 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
-    private val TAG = "SnapBadger"
-    private val RECCOBEATS_BASE_URL = "https://api.reccobeats.com/"
-
     // UI State
     private var statusText by mutableStateOf("Ready")
     private var logText by mutableStateOf("")
@@ -51,7 +48,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Essential: Initialize the MLP Projector
         MLPProjector.init(this)
 
         setContent {
@@ -86,6 +82,8 @@ class MainActivity : ComponentActivity() {
             try {
                 // 1. Authentication
                 statusText = "Checking Network..."
+                // SECURITY NOTE: Credentials are compiled into BuildConfig. In production,
+                // use a backend token exchange to avoid shipping the client secret in the APK.
                 val authHeader = "Basic " + Base64.encodeToString("${BuildConfig.SPOTIFY_CLIENT_ID}:${BuildConfig.SPOTIFY_CLIENT_SECRET}".toByteArray(), Base64.NO_WRAP)
                 
                 val tokenResponse = try {
@@ -107,7 +105,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                val spotifyToken = "Bearer ${tokenResponse.access_token}"
+                val spotifyToken = "Bearer ${tokenResponse.accessToken}"
 
                 // 2. Fetch Top Tracks
                 statusText = "Fetching Top Tracks..."
@@ -217,8 +215,15 @@ class MainActivity : ComponentActivity() {
                     val match = tracks.find { it.trackTitle.contains(trackName, true) }
                     if (match != null) return@withContext match
                 }
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                Log.w(TAG, "Deep search failed for $trackName by $artistName", e)
+            }
             null
         }
+    }
+
+    private companion object {
+        const val TAG = "SnapBadger"
+        const val RECCOBEATS_BASE_URL = "https://api.reccobeats.com/"
     }
 }

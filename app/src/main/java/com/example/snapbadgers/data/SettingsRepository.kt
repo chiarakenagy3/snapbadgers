@@ -4,6 +4,12 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 
+/**
+ * Settings backed by plaintext [android.content.SharedPreferences].
+ *
+ * SECURITY: Spotify API keys and user PII are stored unencrypted on disk.
+ * For production, migrate to EncryptedSharedPreferences (androidx.security:security-crypto).
+ */
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences("snapbadgers_prefs", Context.MODE_PRIVATE)
 

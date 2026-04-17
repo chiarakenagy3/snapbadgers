@@ -8,9 +8,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Comprehensive UI tests for Header composable.
- */
 @RunWith(AndroidJUnit4::class)
 class HeaderTest {
 
@@ -18,83 +15,26 @@ class HeaderTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun headerDisplaysTitle() {
+    fun displaysRequiredElements() {
         composeTestRule.setContent {
             SnapBadgersTheme {
                 Header()
             }
         }
-
-        composeTestRule
-            .onNodeWithText("SnapBadgers")
-            .assertIsDisplayed()
+        composeTestRule.onNodeWithText("SnapBadgers").assertIsDisplayed()
+        composeTestRule.onNodeWithText("AI-Powered Music Recommendations").assertIsDisplayed()
     }
 
     @Test
-    fun headerDisplaysSubtitle() {
-        composeTestRule.setContent {
-            SnapBadgersTheme {
-                Header()
+    fun rendersInBothThemes() {
+        listOf(false, true).forEach { dark ->
+            composeTestRule.setContent {
+                SnapBadgersTheme(darkTheme = dark) {
+                    Header()
+                }
             }
+            composeTestRule.onNodeWithText("SnapBadgers").assertIsDisplayed()
         }
-
-        composeTestRule
-            .onNodeWithText("AI-Powered Music Recommendations")
-            .assertIsDisplayed()
-    }
-
-    @Test
-    fun headerHasCorrectSemantics() {
-        composeTestRule.setContent {
-            SnapBadgersTheme {
-                Header()
-            }
-        }
-
-        // Should have heading semantics for accessibility
-        composeTestRule
-            .onNodeWithText("SnapBadgers")
-            .assertExists()
-    }
-
-    @Test
-    fun headerRendersInDifferentThemes() {
-        // Test light theme
-        composeTestRule.setContent {
-            SnapBadgersTheme(darkTheme = false) {
-                Header()
-            }
-        }
-        composeTestRule
-            .onNodeWithText("SnapBadgers")
-            .assertIsDisplayed()
-
-        // Test dark theme
-        composeTestRule.setContent {
-            SnapBadgersTheme(darkTheme = true) {
-                Header()
-            }
-        }
-        composeTestRule
-            .onNodeWithText("SnapBadgers")
-            .assertIsDisplayed()
-    }
-
-    @Test
-    fun headerLayoutDoesNotOverlap() {
-        composeTestRule.setContent {
-            SnapBadgersTheme {
-                Header()
-            }
-        }
-
-        // Both title and subtitle should be visible without overlap
-        composeTestRule
-            .onNodeWithText("SnapBadgers")
-            .assertIsDisplayed()
-        composeTestRule
-            .onNodeWithText("AI-Powered Music Recommendations")
-            .assertIsDisplayed()
     }
 
     @Test
@@ -104,12 +44,9 @@ class HeaderTest {
                 Header()
             }
         }
-
-        // Header should be accessible for screen readers
-        composeTestRule
-            .onNodeWithText("SnapBadgers")
+        composeTestRule.onNodeWithText("SnapBadgers")
             .assertExists()
-            .assertHasClickAction() // Should not be clickable
+            .assertHasClickAction()
             .assertIsNotEnabled()
     }
 }

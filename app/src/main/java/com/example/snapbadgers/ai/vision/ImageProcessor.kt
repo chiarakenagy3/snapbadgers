@@ -1,4 +1,4 @@
-package com.example.snapbadgers.ml
+package com.example.snapbadgers.ai.vision
 
 import android.graphics.Bitmap
 

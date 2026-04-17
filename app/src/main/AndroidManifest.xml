@@ -5,8 +5,14 @@
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- SECURITY: usesCleartextTraffic=false enforces HTTPS for all network calls.
+         Default on targetSdk 28+ but explicit declaration is best practice.
+         allowBackup=true means `adb backup` can extract SharedPreferences (including
+         Spotify API keys). For production, set allowBackup=false or exclude sensitive
+         prefs in backup_rules.xml. Acceptable for capstone demo scope. -->
     <application
         android:allowBackup="true"
+        android:usesCleartextTraffic="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"

@@ -1,5 +1,6 @@
 package com.example.snapbadgers.songembeddings.network
 
+import com.google.gson.annotations.SerializedName
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.Header
@@ -16,7 +17,7 @@ interface AuthApi {
 }
 
 data class TokenResponse(
-    val access_token: String,
-    val expires_in: Int,
-    val token_type: String
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("expires_in") val expiresIn: Int,
+    @SerializedName("token_type") val tokenType: String
 )

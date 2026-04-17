@@ -10,8 +10,7 @@ import org.mockito.quality.Strictness
 /**
  * Base class for all unit tests.
  *
- * Provides common setup, teardown, and utilities for unit tests.
- * Industry best practice: Centralize common test infrastructure.
+ * Provides common setup, teardown, and assertion utilities.
  */
 abstract class BaseUnitTest {
 
@@ -19,14 +18,10 @@ abstract class BaseUnitTest {
     val mockitoRule: MockitoRule = MockitoJUnit.rule().strictness(Strictness.STRICT_STUBS)
 
     @Before
-    open fun setUp() {
-        // Override in subclasses for specific setup
-    }
+    open fun setUp() {}
 
     @After
-    open fun tearDown() {
-        // Override in subclasses for specific teardown
-    }
+    open fun tearDown() {}
 
     /**
      * Assert that a float array is normalized (L2 norm ≈ 1.0).
