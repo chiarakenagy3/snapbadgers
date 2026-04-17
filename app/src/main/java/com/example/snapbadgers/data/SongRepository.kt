@@ -3,6 +3,7 @@ package com.example.snapbadgers.data
 import android.content.Context
 import android.util.Log
 import com.example.snapbadgers.ai.common.ml.VectorUtils
+import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.text.HeuristicTextEmbedding
 import com.example.snapbadgers.model.EmbeddedTrack
 import com.example.snapbadgers.model.Song
@@ -14,9 +15,10 @@ class SongRepository(context: Context) {
 
     private val appContext = context.applicationContext
     private val gson = Gson()
+    private val fusionEngine = FusionEngine()
     private val embeddedSongs: List<Song> by lazy { loadEmbeddedSongs() }
     private val sampleSongs: List<Song> by lazy { loadSampleSongs() }
-    private val fallbackSongs = listOf(
+    private val fallbackSongs: List<Song> by lazy { listOf(
         Song(
             title = "Blinding Lights",
             artist = "The Weeknd",
@@ -38,7 +40,7 @@ class SongRepository(context: Context) {
                 description = "Weightless by Marconi Union calm study relax sleep ambient"
             )
         )
-    )
+    ) }
 
     fun getAllSongs(): List<Song> = candidateSongs()
 
@@ -79,7 +81,7 @@ class SongRepository(context: Context) {
                     artist = track.artists,
                     embedding = VectorUtils.alignToEmbeddingDimension(
                         track.embedding.toFloatArray(),
-                        salt = track.trackId.hashCode()
+                        salt = QUERY_SALT
                     )
                 )
             }
@@ -131,7 +133,7 @@ class SongRepository(context: Context) {
     }
 
     private fun buildFallbackEmbedding(description: String): FloatArray {
-        return HeuristicTextEmbedding.encode(description)
+        return fusionEngine.fuse(textEmbedding = HeuristicTextEmbedding.encode(description))
     }
 
     private fun buildSampleSongDescription(sample: SampleSongAsset): String {

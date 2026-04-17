@@ -6,11 +6,11 @@ import android.util.Log
 import com.example.snapbadgers.ai.fusion.FusionEngine
 import com.example.snapbadgers.ai.projection.ProjectionNetwork
 import com.example.snapbadgers.ai.sensor.SensorEncoder
-import com.example.snapbadgers.ai.text.TextEncoderDescriptor
+import com.example.snapbadgers.ai.text.StubTextEncoder
 import com.example.snapbadgers.ai.text.TextEncoder
+import com.example.snapbadgers.ai.text.TextEncoderDescriptor
 import com.example.snapbadgers.ai.text.TextEncoderFactory
 import com.example.snapbadgers.ai.text.TextEncoderMode
-import com.example.snapbadgers.ai.text.StubTextEncoder
 import com.example.snapbadgers.ai.vision.VisionEncoder
 import com.example.snapbadgers.data.SongRepository
 import com.example.snapbadgers.model.InferenceSteps
@@ -39,10 +39,10 @@ class RecommendationPipeline(
         TextEncoderFactory.describe(appContext)
     }
 
-    private val sensorEncoder     = SensorEncoder(appContext)
-    private val visionEncoder     = VisionEncoder(appContext)  
-    private val fusionEngine      = FusionEngine()
-    private val projectionNetwork = ProjectionNetwork()        
+    private val sensorEncoder = SensorEncoder(appContext)
+    private val visionEncoder = VisionEncoder(appContext)
+    private val fusionEngine = FusionEngine()
+    private val projectionNetwork = ProjectionNetwork()
 
     val textEncoderLabel: String
         get() = textEncoder?.label ?: textEncoderDescriptor.label
@@ -103,9 +103,8 @@ class RecommendationPipeline(
                 Triple(textDeferred.await(), visionDeferred.await(), sensorDeferred.await())
             }
 
-            // Step 4: Fusion → 128-d fused context embedding
             val fusedEmbedding = fusionEngine.fuse(
-                textEmbedding   = textEmbedding,
+                textEmbedding = textEmbedding,
                 visionEmbedding = visionEmbedding,
                 sensorEmbedding = sensorEmbedding
             )
@@ -113,13 +112,17 @@ class RecommendationPipeline(
             steps = steps.copy(fused = true)
             onStepUpdate(steps)
 
-            // Step 5: Projection → map fused embedding into song embedding space
-            val projectedEmbedding = projectionNetwork.project(fusedEmbedding)
+            // Heuristic fallback catalog embeddings are already in heuristic space,
+            // so projecting only the query would make cosine scores meaningless.
+            val projectedEmbedding = if (useHeuristicTextEncoder) {
+                fusedEmbedding
+            } else {
+                projectionNetwork.project(fusedEmbedding)
+            }
             Log.d(TAG, "Step 5: Projection complete. Embedding size: ${projectedEmbedding.size}")
             steps = steps.copy(projected = true)
             onStepUpdate(steps)
 
-            // Step 6: Song ranking via cosine similarity
             Log.d(TAG, "Step 6: Ranking songs. Catalog size: ${songRepository.getAllSongs().size}")
             val rankedSongs = songRepository.findTopSongs(
                 queryEmbedding = projectedEmbedding,
