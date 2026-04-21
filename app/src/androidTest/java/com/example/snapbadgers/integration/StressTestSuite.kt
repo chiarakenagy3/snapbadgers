@@ -251,7 +251,7 @@ class StressTestSuite {
                     val r = if (width > 1) (x * 255 / (width - 1)) else 128
                     val g = if (height > 1) (y * 255 / (height - 1)) else 128
                     val b = 128
-                    setPixel(x, y, (0xFF000000 or (r shl 16) or (g shl 8) or b).toInt())
+                    setPixel(x, y, (0xFF000000 or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()).toInt())
                 }
             }
         }

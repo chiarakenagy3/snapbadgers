@@ -65,7 +65,7 @@ class ModelLoadTimeEval {
             val coldInterpreter = try {
                 Interpreter(loadMappedFile(modelAsset), Interpreter.Options().apply { setNumThreads(4) })
             } catch (e: Throwable) {
-                Log.e(TAG, "FAIL cold_load $modelAsset: ${e.message}")
+                Log.w(TAG, "SKIP cold_load $modelAsset (unreadable as TFLite flatbuffer): ${e.message}")
                 continue
             }
 
@@ -91,7 +91,7 @@ class ModelLoadTimeEval {
             val warmInterpreter = try {
                 Interpreter(loadMappedFile(modelAsset), Interpreter.Options().apply { setNumThreads(4) })
             } catch (e: Throwable) {
-                Log.e(TAG, "FAIL warm_load $modelAsset: ${e.message}")
+                Log.w(TAG, "SKIP warm_load $modelAsset (unreadable as TFLite flatbuffer): ${e.message}")
                 continue
             }
 
@@ -124,7 +124,7 @@ class ModelLoadTimeEval {
             val interpreter = try {
                 Interpreter(loadMappedFile(modelAsset), Interpreter.Options().apply { setNumThreads(4) })
             } catch (e: Throwable) {
-                Log.e(TAG, "FAIL mem_delta $modelAsset: ${e.message}")
+                Log.w(TAG, "SKIP mem_delta $modelAsset (unreadable as TFLite flatbuffer): ${e.message}")
                 continue
             }
 

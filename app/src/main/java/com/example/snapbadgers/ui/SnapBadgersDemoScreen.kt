@@ -3,9 +3,9 @@ package com.example.snapbadgers.ui
 import android.graphics.Bitmap
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,11 +30,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,12 +50,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.ai.pipeline.RecommendationPipeline
 import com.example.snapbadgers.data.SettingsRepository
 import com.example.snapbadgers.model.HistoryItem
@@ -63,8 +70,6 @@ import com.example.snapbadgers.ui.components.RecommendationCard
 import com.example.snapbadgers.ui.components.SettingsScreen
 import com.example.snapbadgers.ui.i18n.AppI18n
 import com.example.snapbadgers.ui.i18n.AppStrings
-import com.example.snapbadgers.ui.theme.Zinc500
-import com.example.snapbadgers.ui.theme.Zinc800
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import kotlinx.coroutines.launch
@@ -101,109 +106,187 @@ fun SnapBadgersDemoScreen(settingsRepository: SettingsRepository) {
     val hasResult by remember { derivedStateOf { state is UiState.Success } }
     val renderTab by remember { derivedStateOf { if (hasResult && (activeTab == "analyze" || activeTab == "player")) "player" else activeTab } }
 
-    Row(
+    val onAnalyze: () -> Unit = {
+        scope.launch {
+            if (input.isBlank() && capturedBitmap == null) {
+                state = UiState.Error(strings.pleaseProvideInput)
+                return@launch
+            }
+            steps = InferenceSteps()
+            state = UiState.Loading
+            try {
+                val result = pipeline.runPipeline(
+                    input = input,
+                    imageBitmap = capturedBitmap,
+                    onStepUpdate = { steps = it }
+                )
+                state = UiState.Success(result)
+                history.add(0, HistoryItem(query = input.ifBlank { strings.visualSearch }, result = result))
+                if (history.size > 50) history.removeRange(50, history.size)
+                activeTab = "player"
+            } catch (e: Exception) {
+                state = UiState.Error(e.message ?: strings.genericError)
+            }
+        }
+    }
+
+    val onTabSelected: (String) -> Unit = { tab ->
+        activeTab = tab
+        if (tab != "analyze" && tab != "player") {
+            state = UiState.Idle
+        }
+    }
+
+    val content: @Composable () -> Unit = {
+        Crossfade(targetState = renderTab, label = "content") { tab ->
+            when (tab) {
+                "analyze" -> SceneAnalyzer(
+                    strings = strings,
+                    input = input,
+                    onInputChange = { input = it; if (state is UiState.Error) state = UiState.Idle },
+                    capturedBitmap = capturedBitmap,
+                    onBitmapCaptured = { capturedBitmap = it; if (state is UiState.Error) state = UiState.Idle },
+                    isLoading = state is UiState.Loading,
+                    errorMessage = (state as? UiState.Error)?.message,
+                    onDismissError = { state = UiState.Idle },
+                    steps = steps,
+                    pipeline = pipeline,
+                    onAnalyze = onAnalyze
+                )
+
+                "player" -> {
+                    val successState = state as? UiState.Success
+                    if (successState != null) {
+                        RecommendationCard(
+                            result = successState.result,
+                            encoderLabel = pipeline.textEncoderLabel,
+                            isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
+                            strings = strings,
+                            onReset = {
+                                state = UiState.Idle
+                                activeTab = "analyze"
+                            }
+                        )
+                    } else {
+                        activeTab = "analyze"
+                    }
+                }
+
+                "library" -> LibraryScreen(songs = allSongs, strings = strings)
+                "activity" -> HistoryScreen(history = history, strings = strings)
+                "settings" -> SettingsScreen(settingsRepository = settingsRepository)
+                else -> SceneAnalyzer(
+                    strings = strings,
+                    input = input,
+                    onInputChange = { input = it; if (state is UiState.Error) state = UiState.Idle },
+                    capturedBitmap = capturedBitmap,
+                    onBitmapCaptured = { capturedBitmap = it; if (state is UiState.Error) state = UiState.Idle },
+                    isLoading = state is UiState.Loading,
+                    errorMessage = (state as? UiState.Error)?.message,
+                    onDismissError = { state = UiState.Idle },
+                    steps = steps,
+                    pipeline = pipeline,
+                    onAnalyze = onAnalyze
+                )
+            }
+        }
+    }
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Sidebar(
-            activeTab = if (activeTab == "player") "analyze" else activeTab,
-            onTabSelected = { tab ->
-                activeTab = tab
-                if (tab != "analyze" && tab != "player") {
-                    state = UiState.Idle
-                }
+        val isCompact = maxWidth < 600.dp
+        val navTab = if (activeTab == "player") "analyze" else activeTab
+
+        if (isCompact) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                ) { content() }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                BottomNav(activeTab = navTab, strings = strings, onTabSelected = onTabSelected)
             }
-        )
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.surface)
-        ) {
-            val onAnalyze: () -> Unit = {
-                scope.launch {
-                    if (input.isBlank() && capturedBitmap == null) {
-                        state = UiState.Error(strings.pleaseProvideInput)
-                        return@launch
-                    }
-                    steps = InferenceSteps()
-                    state = UiState.Loading
-                    try {
-                        val result = pipeline.runPipeline(
-                            input = input,
-                            imageBitmap = capturedBitmap,
-                            onStepUpdate = { steps = it }
-                        )
-                        state = UiState.Success(result)
-                        history.add(0, HistoryItem(query = input.ifBlank { "Visual Search" }, result = result))
-                        if (history.size > 50) history.removeRange(50, history.size)
-                        activeTab = "player"
-                    } catch (e: Exception) {
-                        state = UiState.Error(e.message ?: "Error")
-                    }
-                }
-            }
-
-            Crossfade(targetState = renderTab, label = "content") { tab ->
-                when (tab) {
-                    "analyze" -> SceneAnalyzer(
-                        strings = strings,
-                        input = input,
-                        onInputChange = { input = it; if (state is UiState.Error) state = UiState.Idle },
-                        capturedBitmap = capturedBitmap,
-                        onBitmapCaptured = { capturedBitmap = it; if (state is UiState.Error) state = UiState.Idle },
-                        isLoading = state is UiState.Loading,
-                        errorMessage = (state as? UiState.Error)?.message,
-                        onDismissError = { state = UiState.Idle },
-                        steps = steps,
-                        pipeline = pipeline,
-                        onAnalyze = onAnalyze
-                    )
-
-                    "player" -> {
-                        val successState = state as? UiState.Success
-                        if (successState != null) {
-                            RecommendationCard(
-                                result = successState.result,
-                                encoderLabel = pipeline.textEncoderLabel,
-                                isModelBackedEncoder = pipeline.isModelBackedTextEncoder,
-                                strings = strings,
-                                onReset = {
-                                    state = UiState.Idle
-                                    activeTab = "analyze"
-                                }
-                            )
-                        } else {
-                            activeTab = "analyze"
-                        }
-                    }
-
-                    "library" -> LibraryScreen(songs = allSongs, strings = strings)
-                    "activity" -> HistoryScreen(history = history, strings = strings)
-                    "settings" -> SettingsScreen(settingsRepository = settingsRepository)
-                    else -> SceneAnalyzer(
-                        strings = strings,
-                        input = input,
-                        onInputChange = { input = it; if (state is UiState.Error) state = UiState.Idle },
-                        capturedBitmap = capturedBitmap,
-                        onBitmapCaptured = { capturedBitmap = it; if (state is UiState.Error) state = UiState.Idle },
-                        isLoading = state is UiState.Loading,
-                        errorMessage = (state as? UiState.Error)?.message,
-                        onDismissError = { state = UiState.Idle },
-                        steps = steps,
-                        pipeline = pipeline,
-                        onAnalyze = onAnalyze
-                    )
-                }
+        } else {
+            Row(modifier = Modifier.fillMaxSize()) {
+                Sidebar(activeTab = navTab, strings = strings, onTabSelected = onTabSelected)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surface)
+                ) { content() }
             }
         }
     }
 }
 
 @Composable
-private fun Sidebar(activeTab: String, onTabSelected: (String) -> Unit) {
+private fun BottomNav(activeTab: String, strings: AppStrings, onTabSelected: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        BottomNavItem(Icons.Default.Search, "analyze", "Analyze", strings.sceneAnalyzer, activeTab == "analyze", onTabSelected)
+        BottomNavItem(Icons.Default.LibraryMusic, "library", "Library", strings.musicLibrary, activeTab == "library", onTabSelected)
+        BottomNavItem(Icons.Default.History, "activity", "History", strings.activityHistory, activeTab == "activity", onTabSelected)
+        BottomNavItem(Icons.Default.Settings, "settings", "Settings", strings.settings, activeTab == "settings", onTabSelected)
+    }
+}
+
+@Composable
+private fun BottomNavItem(
+    icon: ImageVector,
+    id: String,
+    shortLabel: String,
+    accessibilityLabel: String,
+    isSelected: Boolean,
+    onClick: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick(id) }
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = accessibilityLabel,
+                modifier = Modifier.size(22.dp),
+                tint = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = shortLabel,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun Sidebar(activeTab: String, strings: AppStrings, onTabSelected: (String) -> Unit) {
     Column(
         modifier = Modifier
             .width(80.dp)
@@ -215,39 +298,46 @@ private fun Sidebar(activeTab: String, onTabSelected: (String) -> Unit) {
     ) {
         Icon(
             Icons.Default.AutoAwesome,
-            contentDescription = "App logo",
+            contentDescription = null,
             modifier = Modifier.size(32.dp),
             tint = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        SidebarItem(Icons.Default.Search, "analyze", "Scene Analyzer", activeTab == "analyze", onTabSelected)
-        SidebarItem(Icons.Default.LibraryMusic, "library", "Music Library", activeTab == "library", onTabSelected)
-        SidebarItem(Icons.Default.History, "activity", "Activity History", activeTab == "activity", onTabSelected)
+        SidebarItem(Icons.Default.Search, "analyze", strings.sceneAnalyzer, activeTab == "analyze", onTabSelected)
+        SidebarItem(Icons.Default.LibraryMusic, "library", strings.musicLibrary, activeTab == "library", onTabSelected)
+        SidebarItem(Icons.Default.History, "activity", strings.activityHistory, activeTab == "activity", onTabSelected)
 
         Spacer(modifier = Modifier.weight(1f))
 
-        SidebarItem(Icons.Default.Settings, "settings", "Settings", activeTab == "settings", onTabSelected)
+        SidebarItem(Icons.Default.Settings, "settings", strings.settings, activeTab == "settings", onTabSelected)
     }
 }
 
 @Composable
-private fun SidebarItem(icon: ImageVector, id: String, label: String, isSelected: Boolean, onClick: (String) -> Unit) {
-    Box(
+private fun SidebarItem(
+    icon: ImageVector,
+    id: String,
+    accessibilityLabel: String,
+    isSelected: Boolean,
+    onClick: (String) -> Unit
+) {
+    IconButton(
+        onClick = { onClick(id) },
         modifier = Modifier
             .size(48.dp)
             .background(
-                if (isSelected) Zinc800 else Color.Transparent,
+                if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
-            )
-            .clickable { onClick(id) },
-        contentAlignment = Alignment.Center
+            ),
+        colors = IconButtonDefaults.iconButtonColors(
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     ) {
         Icon(
             icon,
-            contentDescription = label,
-            tint = if (isSelected) MaterialTheme.colorScheme.onBackground else Zinc500,
+            contentDescription = accessibilityLabel,
             modifier = Modifier.size(24.dp)
         )
     }
@@ -271,13 +361,12 @@ private fun SceneAnalyzer(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
             text = strings.sceneAnalyzer,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -292,15 +381,14 @@ private fun SceneAnalyzer(
             ) {
                 Text(
                     text = strings.describeYourVibe,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 OutlinedTextField(
                     value = input,
                     onValueChange = onInputChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(strings.inputPlaceholder, color = Zinc500) },
+                    placeholder = { Text(strings.inputPlaceholder, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     enabled = !isLoading,
                     maxLines = 5,
                     shape = RoundedCornerShape(8.dp),
@@ -309,7 +397,7 @@ private fun SceneAnalyzer(
                         unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                         cursorColor = MaterialTheme.colorScheme.onSurface,
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Zinc800,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     )
@@ -321,10 +409,28 @@ private fun SceneAnalyzer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(if (isLoading) strings.analyzing else strings.analyzeScene, fontWeight = FontWeight.Bold)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        Text(
+                            text = if (isLoading) strings.analyzing else strings.analyzeScene,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -348,15 +454,17 @@ private fun SceneAnalyzer(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
-                    Text(
-                        text = "Dismiss",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clickable { onDismissError() }
-                            .padding(start = 12.dp)
-                    )
+                    TextButton(
+                        onClick = onDismissError,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Text(
+                            text = strings.dismiss,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                 }
             }
         }

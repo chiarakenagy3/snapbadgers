@@ -22,15 +22,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.remember
 import com.example.snapbadgers.ui.i18n.AppStrings
-import com.example.snapbadgers.ui.theme.Zinc400
-import com.example.snapbadgers.ui.theme.Zinc700
 
 @Composable
 fun CameraInputCard(
@@ -53,20 +51,20 @@ fun CameraInputCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = strings.cameraPhoto,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() }
             )
 
             Text(
                 text = if (capturedBitmap == null) strings.cameraHint else strings.cameraAttachedHint,
                 style = MaterialTheme.typography.bodySmall,
-                color = Zinc400
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Row(
@@ -78,8 +76,8 @@ fun CameraInputCard(
                     enabled = enabled,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Text(if (capturedBitmap == null) strings.capturePhoto else strings.retakePhoto)
@@ -89,7 +87,7 @@ fun CameraInputCard(
                     onClick = { onBitmapCaptured(null) },
                     enabled = enabled && capturedBitmap != null,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Zinc400)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Text(strings.clearPhoto)
                 }
@@ -99,12 +97,12 @@ fun CameraInputCard(
                 val imageBitmap = remember(capturedBitmap) { capturedBitmap.asImageBitmap() }
                 Image(
                     bitmap = imageBitmap,
-                    contentDescription = strings.cameraPhoto,
+                    contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(220.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Zinc700),
+                        .background(MaterialTheme.colorScheme.surface),
                     contentScale = ContentScale.Crop
                 )
             }

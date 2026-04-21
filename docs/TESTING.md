@@ -7,7 +7,7 @@ JUnit 4 with AndroidX Test. Three tiers:
 * **JVM Unit Tests** (`app/src/test/`): Pure-Kotlin pipeline stages. Vector math, embedding quality, fusion, projection, sensor features, end-to-end heuristic pipeline. No device required.
 * **Instrumented Evals** (`app/src/androidTest/.../eval/`): On-device model validation. Inference latency (p50/p95/p99), accuracy, load times, memory profiling. Require TFLite model assets.
 * **Instrumented Integration Tests** (`app/src/androidTest/.../integration/`): End-to-end recommendation, NPU validation, stress tests, BertTokenizer integration.
-* **UI Tests** (`app/src/androidTest/.../ui/`): Compose component tests for Header, InferenceStatusCard, RecommendationCard, error scenarios.
+* **UI Tests** (`app/src/androidTest/.../ui/`): Compose component error-state tests.
 
 ## Running Tests
 
@@ -36,16 +36,24 @@ Evals print metrics to stdout. Filter for lines starting with `EVAL`.
 
 ### Instrumented Tests (Device Required)
 
+Use `:app:onDeviceTest` — it installs via plain `adb install` and runs via `am instrument`.
+This is the canonical path for this repo because AGP 9's bundled ddmlib `SplitApkInstaller`
+fails with `Failed to install-write all apks` against usbipd-forwarded devices (WSL2 rigs),
+and the `onDeviceTest` path works identically on native-USB rigs as well.
+
 ```bash
 # All instrumented tests
-./gradlew connectedDebugAndroidTest
+./gradlew :app:onDeviceTest
 
-# Eval suite only
-./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.snapbadgers.eval.InferenceLatencyEval
-./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.snapbadgers.eval.MemoryProfileEval
-./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.snapbadgers.eval.ModelAccuracyEval
-./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.snapbadgers.eval.ModelLoadTimeEval
+# Single class
+./gradlew :app:onDeviceTest -PtestClass=com.example.snapbadgers.eval.InferenceLatencyEval
+
+# Exclude a class (e.g. to skip the long battery eval)
+./gradlew :app:onDeviceTest -PnotClass=com.example.snapbadgers.eval.BatteryImpactEval
 ```
+
+`connectedDebugAndroidTest` is the AGP default but is NOT recommended on this repo — it
+fails over usbipd. If you are on a native-USB rig and prefer it, it still works there.
 
 Instrumented evals log via `Log.i("EVAL", ...)`. Filter: `adb logcat -s EVAL`.
 
@@ -76,6 +84,8 @@ Instrumented evals log via `Log.i("EVAL", ...)`. Filter: `adb logcat -s EVAL`.
 | `ModelAccuracyEval` | Text encoder known-input verification, cross-run consistency (10x), vision encoder color inputs (5 colors), vision stability, heuristic keyword feature activation | Non-blank -> non-zero; mood separation sim < 0.99; 9/10 identical; vision deterministic 10x |
 | `ModelLoadTimeEval` | Cold/warm load time for 3 TFLite models. Memory delta per model. Input/output tensor shapes. | Cold < 30s; warm < 15s |
 | `MemoryProfileEval` | 50-iteration peak memory, monotonic growth leak detection (30 iterations x10 ops), per-encoder memory impact | Max consecutive increases < 20 (leak indicator); peak memory positive |
+| `SustainedLoadEval` | 200-iteration full-pipeline run; early/late window drift ratio as thermal throttling proxy | Drift ratio <= 3.0 |
+| `BatteryImpactEval` | BatteryManager deltas (capacity%, energy, charge, current, temperature) across 150 pipeline iterations | Capacity delta >= -5% while discharging |
 
 ### Instrumented Integration Tests
 
@@ -85,15 +95,16 @@ Instrumented evals log via `Log.i("EVAL", ...)`. Filter: `adb logcat -s EVAL`.
 | `HardwareNpuValidationTest` | Qualcomm SoC detection, NNAPI availability, NPU performance characteristics, thermal throttling, Hexagon DSP |
 | `StressTestSuite` | Pipeline under sustained load |
 | `BertTokenizerIntegrationTest` | WordPiece tokenization against real `vocab.txt` asset |
+| `CameraCaptureIntegrationTest` | CameraInputCard hoisted-state contract and pipeline vision-input wiring |
+| `SensorEncoderLifecycleTest` | Sensor encoder start/stop idempotency, concurrent-embedding safety, 14-d features |
+| `VisionEncoderFallbackTest` | VisionEncoder stub fallback when model asset is missing, determinism |
 
 ### UI Tests
 
 | Test Class | What It Validates |
 | :--- | :--- |
-| `HeaderTest` | Header composable rendering |
-| `InferenceStatusCardTest` | Inference step display and state transitions |
-| `RecommendationCardTest` | Song recommendation card layout and content |
-| `UiErrorScenarioTest` | Error state handling in UI components |
+| `SnapBadgersUiTest` | Main screen initialization, sidebar navigation (Library/History/Settings), text input + Analyze button |
+| `SongEmbeddingUiPerformanceTest` | Navigation latency to Music Library tab |
 
 ## Latency Targets
 

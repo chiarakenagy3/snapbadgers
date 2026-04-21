@@ -1,7 +1,6 @@
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-SDK_36-3DDC84?logo=android&logoColor=white)
 ![TFLite](https://img.shields.io/badge/TFLite-2.16-FF6F00?logo=tensorflow&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
 
 # SnapBadgers
 
@@ -37,6 +36,21 @@ When model assets are unavailable (e.g., on emulators), the pipeline falls back 
 * Android SDK 36 (compile) / SDK 24+ (min)
 * Physical device recommended (Samsung Galaxy S25 or other Qualcomm SoC for NPU acceleration)
 
+### Toolchain
+
+Pinned versions used to build and verify this app:
+
+| Component | Version |
+| :--- | :--- |
+| JDK | 17 |
+| Android Gradle Plugin | 9.0.1 |
+| Kotlin | 2.2.10 |
+| Gradle | 8.x |
+| `compileSdk` / `targetSdk` | 36 |
+| `minSdk` | 24 |
+
+Authoritative source: [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+
 ### Build and Run
 
 ```bash
@@ -46,9 +60,22 @@ cd snapbadgers
 
 Open in Android Studio, sync Gradle, and run on a physical device or emulator.
 
-### Model Assets
+### Getting the models
 
-The TFLite model files are not checked into git. Place these in `app/src/main/assets/`:
+The TFLite model files live under `app/src/main/assets/` but are not packaged with the source distribution. Generate them with the bundled download/export script:
+
+```bash
+# 1. Install the Qualcomm AI Hub Python client
+pip install qai-hub
+
+# 2. Set your AI Hub API token (do NOT hard-code it)
+export QAI_HUB_API_TOKEN="<your-token-from-aihub.qualcomm.com>"
+
+# 3. Run the download / export pipeline
+python model_dl.py
+```
+
+This produces and places the following into `app/src/main/assets/`:
 
 | File | Purpose |
 | :--- | :--- |
@@ -56,19 +83,23 @@ The TFLite model files are not checked into git. Place these in `app/src/main/as
 | `vocab.txt` | WordPiece vocabulary for BertTokenizer |
 | `efficientnet_b0_128d_int8.tflite` | EfficientNet-B0 vision encoder (int8 quantized) |
 
-The app functions without these files using heuristic fallback encoders.
+The app functions without these files using heuristic fallback encoders, but on-device acceleration requires the real models.
 
 ### Spotify Credentials (Optional)
 
-For the song embedding sync feature, add to `local.properties`:
+The song-embedding sync module uses the Spotify Web API to pull a user's top
+tracks and derive audio features. If you don't supply credentials the app
+falls back to the bundled `sample_songs.json` catalog.
+
+1. Create an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and copy the **Client ID** and **Client Secret**.
+2. Generate a **Refresh Token** with the `user-top-read` scope.
+3. Add the following to `local.properties` — the build injects them into `BuildConfig`:
 
 ```properties
 spotify.client.id="YOUR_CLIENT_ID"
 spotify.client.secret="YOUR_CLIENT_SECRET"
 spotify.refresh.token="YOUR_REFRESH_TOKEN"
 ```
-
-See [README_SongEmbeddings.md](README_SongEmbeddings.md) for full Spotify setup instructions.
 
 ### Running Tests
 
@@ -87,8 +118,7 @@ See [README_SongEmbeddings.md](README_SongEmbeddings.md) for full Spotify setup 
 
 * **[ARCHITECTURE.md](docs/ARCHITECTURE.md):** System design, 6-stage pipeline data flow, tech stack decisions, threading model, and hardware acceleration strategy.
 * **[TESTING.md](docs/TESTING.md):** Test strategy, eval suite inventory, running tests, latency targets, and troubleshooting.
-* **[README_SongEmbeddings.md](README_SongEmbeddings.md):** Spotify sync module setup and embedding generation.
 
-## Project Information
+## Third-party assets
 
-Developed by **Team Qualcomm** for CS 620.
+Models downloaded by `model_dl.py` are sourced from [Qualcomm AI Hub](https://aihub.qualcomm.com/models) and are released under separate licenses. Refer to each model's page on AI Hub (or the corresponding entry in [`qualcomm/ai-hub-models`](https://github.com/qualcomm/ai-hub-models)) for license details.

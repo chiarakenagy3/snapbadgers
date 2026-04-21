@@ -22,17 +22,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.data.SettingsRepository
 import androidx.compose.foundation.layout.ColumnScope
 import com.example.snapbadgers.ui.i18n.AppI18n
-import com.example.snapbadgers.ui.theme.Zinc400
-import com.example.snapbadgers.ui.theme.Zinc500
-import com.example.snapbadgers.ui.theme.Zinc800
 
 @Composable
 fun SettingsScreen(settingsRepository: SettingsRepository) {
@@ -49,13 +44,12 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
             text = strings.settings,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -64,7 +58,7 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
                 label = strings.spotifyClientId,
                 value = spotifyKey,
                 onValueChange = { settingsRepository.updateSpotifyKey(it) },
-                placeholder = "Enter your Spotify Client ID"
+                placeholder = strings.spotifyClientIdPlaceholder
             )
         }
 
@@ -73,13 +67,13 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
                 label = strings.displayName,
                 value = displayName,
                 onValueChange = { settingsRepository.updateDisplayName(it) },
-                placeholder = "Enter your name"
+                placeholder = strings.displayNamePlaceholder
             )
             SettingsInputField(
                 label = strings.email,
                 value = email,
                 onValueChange = { settingsRepository.updateEmail(it) },
-                placeholder = "Enter your email"
+                placeholder = strings.emailPlaceholder
             )
         }
 
@@ -87,7 +81,7 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
         SettingsSection(title = strings.appearance) {
             SettingsOptionSelector(
                 label = strings.theme,
-                description = "Choose app brightness and color preference",
+                description = strings.themeDescription,
                 options = themeOptions,
                 selectedOption = themeMode,
                 onOptionSelected = { settingsRepository.updateThemeMode(it) }
@@ -98,7 +92,7 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
         SettingsSection(title = strings.language) {
             SettingsOptionSelector(
                 label = strings.language,
-                description = "Set your preferred display language",
+                description = strings.languageDescription,
                 options = languageOptions,
                 selectedOption = language,
                 onOptionSelected = { settingsRepository.updateLanguage(it) }
@@ -108,28 +102,28 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
         SettingsSection(title = strings.preferences) {
             SettingsToggle(
                 label = strings.pushNotifications,
-                description = "Receive alerts for fresh recommendations",
+                description = strings.pushNotificationsDescription,
                 checked = notificationsEnabled,
                 onCheckedChange = { settingsRepository.updateNotificationsEnabled(it) }
             )
             SettingsToggle(
                 label = strings.personalizedRecommendations,
-                description = "Use your history and profile to improve suggestions",
+                description = strings.personalizedRecommendationsDescription,
                 checked = personalizationEnabled,
                 onCheckedChange = { settingsRepository.updatePersonalizationEnabled(it) }
             )
         }
 
-        SettingsSection(title = "About") {
+        SettingsSection(title = strings.aboutSection) {
             Text(
                 text = "SnapBadgers v1.0.4",
-                color = Zinc400,
-                fontSize = 14.sp
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "Multimodal music recommendation demo",
-                color = Zinc500,
-                fontSize = 12.sp
+                text = strings.appTagline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
             )
         }
     }
@@ -141,8 +135,7 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
         Text(
             text = title,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(start = 4.dp)
         )
         Card(
@@ -168,12 +161,12 @@ private fun SettingsInputField(
     placeholder: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(placeholder, color = Zinc500) },
+            placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             shape = RoundedCornerShape(8.dp),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
@@ -198,8 +191,8 @@ private fun SettingsOptionSelector(
     onOptionSelected: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-        Text(text = description, color = Zinc500, fontSize = 12.sp)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+        Text(text = description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -222,7 +215,7 @@ private fun SettingsOptionSelector(
                             .padding(vertical = 10.dp),
                         textAlign = TextAlign.Center,
                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                     )
                 }
@@ -244,8 +237,8 @@ private fun SettingsToggle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Text(text = description, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            Text(text = label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+            Text(text = description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Switch(
             checked = checked,

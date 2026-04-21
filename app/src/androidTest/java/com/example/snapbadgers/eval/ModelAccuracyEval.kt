@@ -105,7 +105,7 @@ class ModelAccuracyEval {
     }
 
     @Test
-    fun visionEncoderKnownInputs() = runBlocking {
+    fun visionEncoderKnownInputs(): Unit = runBlocking {
         Log.i(TAG, "=== Vision Encoder Accuracy Eval ===")
 
         val encoder = VisionEncoder(context).also { visionEncoder = it }

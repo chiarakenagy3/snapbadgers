@@ -3,6 +3,7 @@ package com.example.snapbadgers.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,13 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 import com.example.snapbadgers.model.HistoryItem
 import com.example.snapbadgers.model.Song
 import com.example.snapbadgers.ui.i18n.AppStrings
-import com.example.snapbadgers.ui.theme.Zinc400
-import com.example.snapbadgers.ui.theme.Zinc500
-import com.example.snapbadgers.ui.theme.Zinc800
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -45,13 +42,12 @@ fun LibraryScreen(songs: List<Song>, strings: AppStrings) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
             text = strings.musicLibrary,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -64,6 +60,7 @@ fun LibraryScreen(songs: List<Song>, strings: AppStrings) {
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(songs, key = { "${it.title}-${it.artist}" }) { song ->
@@ -79,13 +76,12 @@ fun HistoryScreen(history: List<HistoryItem>, strings: AppStrings) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
             text = strings.activityHistory,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -98,10 +94,11 @@ fun HistoryScreen(history: List<HistoryItem>, strings: AppStrings) {
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(history, key = { it.id }) { item ->
-                    HistoryCard(item)
+                    HistoryCard(item, strings)
                 }
             }
         }
@@ -123,22 +120,21 @@ private fun SongItem(song: Song) {
             Icon(
                 Icons.Default.MusicNote,
                 contentDescription = null,
-                tint = Zinc400,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = song.artist,
-                    color = Zinc500,
-                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -148,7 +144,7 @@ private fun SongItem(song: Song) {
 }
 
 @Composable
-private fun HistoryCard(item: HistoryItem) {
+private fun HistoryCard(item: HistoryItem, strings: AppStrings) {
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
     val dateString = remember(item.timestamp) { dateFormat.format(Date(item.timestamp)) }
 
@@ -168,57 +164,44 @@ private fun HistoryCard(item: HistoryItem) {
             ) {
                 Text(
                     text = dateString,
-                    color = Zinc500,
-                    fontSize = 12.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    text = "${item.result.recommendations.size} tracks",
-                    color = Zinc400,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                    text = "${item.result.recommendations.size} ${strings.tracksSuffix}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium
                 )
             }
 
             Text(
                 text = "\"${item.query}\"",
                 color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
 
             item.result.topRecommendation?.let { song ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Zinc800, RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = ">",
+                        text = song.title,
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 12.sp
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = song.title,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = song.artist,
-                            color = Zinc400,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = song.artist,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -236,19 +219,18 @@ private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
             icon,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = Zinc800
+            tint = MaterialTheme.colorScheme.outline
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = title,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = subtitle,
-            color = Zinc500,
-            fontSize = 16.sp
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }

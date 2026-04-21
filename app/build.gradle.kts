@@ -130,3 +130,36 @@ tasks.withType<Test>().configureEach {
         classpath = classpath.plus(kotlinUnitTestClasses)
     }
 }
+
+// Sidesteps AGP's bundled ddmlib SplitApkInstaller, which consistently fails with
+// "Failed to install-write all apks" when the device is forwarded via usbipd-win from
+// WSL2. Manual `adb install -r -t` + `am instrument` works on the same device.
+// Usage:
+//   ./gradlew :app:onDeviceTest                         (runs the whole androidTest suite)
+//   ./gradlew :app:onDeviceTest -PtestClass=FQN         (runs a specific @Test class)
+//   ./gradlew :app:onDeviceTest -PnotClass=FQN          (excludes a class)
+tasks.register<Exec>("onDeviceTest") {
+    group = "verification"
+    description = "Installs debug + androidTest APKs via plain `adb install` and runs `am instrument`. Use when gradle's ddmlib install path is broken (e.g., WSL+usbipd)."
+
+    dependsOn("assembleDebug", "assembleDebugAndroidTest")
+
+    val appApk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")
+    val testApk = layout.buildDirectory.file("outputs/apk/androidTest/debug/app-debug-androidTest.apk")
+
+    val testClass = project.findProperty("testClass") as String?
+    val notClass = project.findProperty("notClass") as String?
+    val filter = when {
+        testClass != null -> "-e class $testClass"
+        notClass != null -> "-e notClass $notClass"
+        else -> ""
+    }
+
+    commandLine("sh", "-c", buildString {
+        append("set -e; ")
+        append("adb install -r -t '${appApk.get().asFile.absolutePath}' && ")
+        append("adb install -r -t '${testApk.get().asFile.absolutePath}' && ")
+        append("adb shell am instrument -w -r $filter ")
+        append("com.example.snapbadgers.test/androidx.test.runner.AndroidJUnitRunner")
+    })
+}

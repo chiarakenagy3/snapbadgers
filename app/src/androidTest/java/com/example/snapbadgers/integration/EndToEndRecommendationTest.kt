@@ -146,7 +146,7 @@ class EndToEndRecommendationTest {
             for (y in 0 until 224) {
                 for (x in 0 until 224) {
                     val blue = ((y * 128 / 224) + 64).coerceIn(0, 255)
-                    setPixel(x, y, (0xFF000000 or blue).toInt())
+                    setPixel(x, y, (0xFF000000 or blue.toLong()).toInt())
                 }
             }
         }
@@ -157,7 +157,7 @@ class EndToEndRecommendationTest {
             for (y in 0 until 224) {
                 for (x in 0 until 224) {
                     val gray = 100 + (x + y) % 50
-                    setPixel(x, y, (0xFF000000 or (gray shl 16) or (gray shl 8) or (gray + 20)).toInt())
+                    setPixel(x, y, (0xFF000000 or (gray.toLong() shl 16) or (gray.toLong() shl 8) or (gray + 20).toLong()).toInt())
                 }
             }
         }
@@ -170,7 +170,7 @@ class EndToEndRecommendationTest {
                     val r = (x * 255 / 224).coerceIn(0, 255)
                     val g = (y * 255 / 224).coerceIn(0, 255)
                     val b = ((x + y) * 255 / 448).coerceIn(0, 255)
-                    setPixel(x, y, (0xFF000000 or (r shl 16) or (g shl 8) or b).toInt())
+                    setPixel(x, y, (0xFF000000 or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()).toInt())
                 }
             }
         }

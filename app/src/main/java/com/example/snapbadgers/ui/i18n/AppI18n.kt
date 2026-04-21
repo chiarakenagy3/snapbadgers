@@ -52,7 +52,34 @@ data class AppStrings(
     // Inference Pipeline
     val inferencePipeline: String,
     val running: String,
-    val ready: String
+    val ready: String,
+    // Common
+    val dismiss: String,
+    val tracksSuffix: String,
+    // Inference Pipeline steps
+    val stepTextEncoding: String,
+    val stepSensorEncoding: String,
+    val stepVisionEncoding: String,
+    val stepFusion: String,
+    val stepProjection: String,
+    val stepSimilarity: String,
+    val statusDone: String,
+    val statusPending: String,
+    val statusSkipped: String,
+    val modeModelBacked: String,
+    val modeFallbackStub: String,
+    val visualSearch: String,
+    val genericError: String,
+    // Settings placeholders / descriptions
+    val spotifyClientIdPlaceholder: String,
+    val displayNamePlaceholder: String,
+    val emailPlaceholder: String,
+    val themeDescription: String,
+    val languageDescription: String,
+    val pushNotificationsDescription: String,
+    val personalizedRecommendationsDescription: String,
+    val aboutSection: String,
+    val appTagline: String
 )
 
 object AppI18n {
@@ -108,7 +135,31 @@ object AppI18n {
         clearPhoto = "Clear Photo",
         inferencePipeline = "Inference Pipeline",
         running = "RUNNING",
-        ready = "READY"
+        ready = "READY",
+        dismiss = "Dismiss",
+        tracksSuffix = "tracks",
+        stepTextEncoding = "Text encoding",
+        stepSensorEncoding = "Sensor encoding",
+        stepVisionEncoding = "Vision encoding",
+        stepFusion = "Fusion",
+        stepProjection = "Projection",
+        stepSimilarity = "Similarity search",
+        statusDone = "Done",
+        statusPending = "Pending",
+        statusSkipped = "Skipped",
+        modeModelBacked = "Mode: model-backed",
+        modeFallbackStub = "Mode: fallback stub",
+        visualSearch = "Visual Search",
+        genericError = "Something went wrong.",
+        spotifyClientIdPlaceholder = "Enter your Spotify Client ID",
+        displayNamePlaceholder = "Enter your name",
+        emailPlaceholder = "Enter your email",
+        themeDescription = "Choose app brightness and color preference",
+        languageDescription = "Set your preferred display language",
+        pushNotificationsDescription = "Receive alerts for fresh recommendations",
+        personalizedRecommendationsDescription = "Use your history and profile to improve suggestions",
+        aboutSection = "About",
+        appTagline = "Multimodal music recommendation demo"
     )
 
     private val CHINESE = AppStrings(
@@ -156,7 +207,31 @@ object AppI18n {
         clearPhoto = "\u6E05\u9664\u7167\u7247",
         inferencePipeline = "\u63A8\u7406\u7BA1\u9053",
         running = "\u8FD0\u884C\u4E2D",
-        ready = "\u5C31\u7EEA"
+        ready = "\u5C31\u7EEA",
+        dismiss = "\u5173\u95ED",
+        tracksSuffix = "\u9996\u6B4C\u66F2",
+        stepTextEncoding = "\u6587\u672C\u7F16\u7801",
+        stepSensorEncoding = "\u4F20\u611F\u5668\u7F16\u7801",
+        stepVisionEncoding = "\u89C6\u89C9\u7F16\u7801",
+        stepFusion = "\u878D\u5408",
+        stepProjection = "\u6295\u5F71",
+        stepSimilarity = "\u76F8\u4F3C\u5EA6\u641C\u7D22",
+        statusDone = "\u5B8C\u6210",
+        statusPending = "\u7B49\u5F85\u4E2D",
+        statusSkipped = "\u8DF3\u8FC7",
+        modeModelBacked = "\u6A21\u5F0F\uFF1A\u6A21\u578B\u652F\u6301",
+        modeFallbackStub = "\u6A21\u5F0F\uFF1A\u5907\u7528\u6A21\u5757",
+        visualSearch = "\u89C6\u89C9\u641C\u7D22",
+        genericError = "\u53D1\u751F\u9519\u8BEF\u3002",
+        spotifyClientIdPlaceholder = "\u8F93\u5165 Spotify \u5BA2\u6237\u7AEF ID",
+        displayNamePlaceholder = "\u8F93\u5165\u60A8\u7684\u59D3\u540D",
+        emailPlaceholder = "\u8F93\u5165\u60A8\u7684\u7535\u5B50\u90AE\u4EF6",
+        themeDescription = "\u9009\u62E9\u5E94\u7528\u4EAE\u5EA6\u548C\u989C\u8272\u504F\u597D",
+        languageDescription = "\u8BBE\u7F6E\u60A8\u7684\u9996\u9009\u663E\u793A\u8BED\u8A00",
+        pushNotificationsDescription = "\u63A5\u6536\u65B0\u63A8\u8350\u7684\u63D0\u9192",
+        personalizedRecommendationsDescription = "\u4F7F\u7528\u60A8\u7684\u5386\u53F2\u548C\u4E2A\u4EBA\u8D44\u6599\u6539\u8FDB\u5EFA\u8BAE",
+        aboutSection = "\u5173\u4E8E",
+        appTagline = "\u591A\u6A21\u6001\u97F3\u4E50\u63A8\u8350\u6F14\u793A"
     )
 
     private val SPANISH = AppStrings(
@@ -204,6 +279,30 @@ object AppI18n {
         clearPhoto = "Borrar foto",
         inferencePipeline = "Pipeline de Inferencia",
         running = "EJECUTANDO",
-        ready = "LISTO"
+        ready = "LISTO",
+        dismiss = "Descartar",
+        tracksSuffix = "pistas",
+        stepTextEncoding = "Codificaci\u00F3n de texto",
+        stepSensorEncoding = "Codificaci\u00F3n de sensores",
+        stepVisionEncoding = "Codificaci\u00F3n visual",
+        stepFusion = "Fusi\u00F3n",
+        stepProjection = "Proyecci\u00F3n",
+        stepSimilarity = "B\u00FAsqueda por similitud",
+        statusDone = "Listo",
+        statusPending = "Pendiente",
+        statusSkipped = "Omitido",
+        modeModelBacked = "Modo: respaldado por modelo",
+        modeFallbackStub = "Modo: respaldo",
+        visualSearch = "B\u00FAsqueda visual",
+        genericError = "Algo sali\u00F3 mal.",
+        spotifyClientIdPlaceholder = "Ingresa tu ID de Cliente Spotify",
+        displayNamePlaceholder = "Ingresa tu nombre",
+        emailPlaceholder = "Ingresa tu correo electr\u00F3nico",
+        themeDescription = "Elige el brillo y color de la app",
+        languageDescription = "Elige tu idioma de visualizaci\u00F3n",
+        pushNotificationsDescription = "Recibe avisos de nuevas recomendaciones",
+        personalizedRecommendationsDescription = "Usa tu historial y perfil para mejorar sugerencias",
+        aboutSection = "Acerca de",
+        appTagline = "Demo de recomendaci\u00F3n musical multimodal"
     )
 }

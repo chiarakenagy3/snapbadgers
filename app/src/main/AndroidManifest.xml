@@ -5,6 +5,13 @@
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Camera capture is delegated to the system camera app via TakePicturePreview,
+         so no CAMERA permission is needed. Declare the hardware as optional so the
+         Play Store does not filter out devices without a camera. -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <!-- SECURITY: usesCleartextTraffic=false enforces HTTPS for all network calls.
          Default on targetSdk 28+ but explicit declaration is best practice.
          allowBackup=true means `adb backup` can extract SharedPreferences (including

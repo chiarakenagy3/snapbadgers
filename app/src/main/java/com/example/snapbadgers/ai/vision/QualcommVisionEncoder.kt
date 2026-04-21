@@ -37,10 +37,6 @@ class QualcommVisionEncoder(
     private var interpreter: Interpreter? = null
     private var nnApiDelegate: NnApiDelegate? = null
 
-    private val inputBuffer = ByteBuffer.allocateDirect(1 * INPUT_SIZE * INPUT_SIZE * 3 * 4).apply {
-        order(ByteOrder.nativeOrder())
-    }
-
     private fun initializeInterpreter() {
         if (interpreter != null) return
 
@@ -68,7 +64,9 @@ class QualcommVisionEncoder(
             val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
             resizedBitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
 
-            inputBuffer.clear()
+            val inputBuffer = ByteBuffer.allocateDirect(INPUT_SIZE * INPUT_SIZE * 3 * 4).apply {
+                order(ByteOrder.nativeOrder())
+            }
 
             for (pixel in pixels) {
                 val r = (pixel shr 16) and 0xFF

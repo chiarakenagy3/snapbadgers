@@ -2,11 +2,12 @@ package com.example.snapbadgers
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.example.snapbadgers.ui.MainActivity
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -15,6 +16,11 @@ class SnapBadgersUiTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
+    @Before
+    fun wakeScreen() {
+        wakeScreenForTest()
+    }
+
     /**
      * Verify that the main screen (Scene Analyzer) loads correctly
      * and displays the essential UI elements.
@@ -22,7 +28,7 @@ class SnapBadgersUiTest {
     @Test
     fun testMainScreenInitialization() {
         composeTestRule.onNodeWithText("Scene Analyzer").assertIsDisplayed()
-        composeTestRule.onNodeWithText("e.g. A rainy afternoon in a cozy cafe").assertIsDisplayed()
+        composeTestRule.onNodeWithText("e.g. rainy afternoon studying at a coffee shop").assertIsDisplayed()
         composeTestRule.onNodeWithText("Analyze Scene").assertIsDisplayed()
     }
 
@@ -31,7 +37,7 @@ class SnapBadgersUiTest {
      */
     @Test
     fun testNavigationToLibrary() {
-        composeTestRule.onNodeWithContentDescription("library").performClick()
+        composeTestRule.onNodeWithText("Library").performClick()
         composeTestRule.onNodeWithText("Music Library").assertIsDisplayed()
     }
 
@@ -40,7 +46,7 @@ class SnapBadgersUiTest {
      */
     @Test
     fun testNavigationToHistory() {
-        composeTestRule.onNodeWithContentDescription("activity").performClick()
+        composeTestRule.onNodeWithText("History").performClick()
         composeTestRule.onNodeWithText("Activity History").assertIsDisplayed()
     }
 
@@ -49,8 +55,7 @@ class SnapBadgersUiTest {
      */
     @Test
     fun testNavigationToSettings() {
-        composeTestRule.onNodeWithContentDescription("settings").performClick()
-        composeTestRule.onNodeWithText("Settings").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Settings")[0].performClick()
         composeTestRule.onNodeWithText("Account").assertIsDisplayed()
     }
 
@@ -59,7 +64,7 @@ class SnapBadgersUiTest {
      */
     @Test
     fun testTextInputAndAnalyzeButton() {
-        composeTestRule.onNodeWithText("e.g. A rainy afternoon in a cozy cafe")
+        composeTestRule.onNodeWithText("e.g. rainy afternoon studying at a coffee shop")
             .performTextInput("Party vibes")
         composeTestRule.onNodeWithText("Analyze Scene").assertIsDisplayed()
     }

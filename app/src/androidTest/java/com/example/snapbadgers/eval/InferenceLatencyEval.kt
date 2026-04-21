@@ -48,7 +48,12 @@ class InferenceLatencyEval {
         visionEncoder?.close()
     }
 
-    private fun benchmarkLatency(label: String, warmup: Int = WARMUP_ITERATIONS, iterations: Int = BENCHMARK_ITERATIONS, block: () -> Unit) {
+    private suspend fun benchmarkLatency(
+        label: String,
+        warmup: Int = WARMUP_ITERATIONS,
+        iterations: Int = BENCHMARK_ITERATIONS,
+        block: suspend () -> Unit
+    ) {
         repeat(warmup) { block() }
 
         val latencies = LongArray(iterations)
@@ -72,6 +77,10 @@ class InferenceLatencyEval {
             StubTextEncoder("Benchmark stub")
         }
 
+        // Force any fallback to activate before reading label/mode — FallbackTextEncoder
+        // reports the *primary* encoder until the first encode call fails and switches
+        // activeEncoder to the fallback. Without this, label/mode lies about what ran.
+        encoder.encode("warmup")
         Log.i(TAG, "text_encoder_type: ${encoder.label} mode=${encoder.mode}")
 
         benchmarkLatency("text_encoder") { encoder.encode("calm relaxing study music with piano") }
@@ -88,7 +97,7 @@ class InferenceLatencyEval {
     }
 
     @Test
-    fun heuristicTextEmbeddingLatency() {
+    fun heuristicTextEmbeddingLatency() = runBlocking {
         Log.i(TAG, "=== Heuristic Text Embedding Latency Eval ===")
 
         benchmarkLatency("heuristic_text") { HeuristicTextEmbedding.encode("happy energetic workout playlist for morning run") }
