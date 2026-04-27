@@ -87,7 +87,7 @@ See [README_SongEmbeddings.md](README_SongEmbeddings.md) for full Spotify setup 
 * **Evaluation coverage** — test suite validates latency, correctness, and pipeline behavior across multiple scenarios  
 * **Recommendation system** — app generates top 3 song recommendations using fused multimodal embeddings and cosine similarity  
 
-## What Doesn't (Yet)
+## What Doesn't 
 * **Limited personalization** — recommendations are not yet adapted to individual user preferences or feedback  
 * **Similarity performance** — similarity score quality still shows room for improvement, particularly in edge or ambiguous cases  
 * **Cold-start limitations** — without strong input signals (e.g., no image or weak query), results can be generic  
