@@ -6,6 +6,8 @@
 
 **SnapBadgers** is an Android application that recommends songs by fusing multimodal input -- a text query, an optional camera image, and live device sensor readings -- through a 6-stage on-device ML pipeline. All inference runs locally using TensorFlow Lite with NNAPI delegation for NPU acceleration on Qualcomm SoCs.
 
+### [Project Repo Link](https://github.com/chiarakenagy3/snapbadgers)
+
 ### How It Works
 
 1. **Text Encoding.** A user query (e.g., "energetic workout music") is tokenized and encoded by MobileBERT into a 128-d embedding.
@@ -79,6 +81,22 @@ See [README_SongEmbeddings.md](README_SongEmbeddings.md) for full Spotify setup 
 # Instrumented tests (requires device)
 ./gradlew connectedDebugAndroidTest
 ```
+## What Works
+* **End-to-end multimodal pipeline** — all six stages (text, vision, sensor, fusion, projection, ranking) function cohesively on-device  
+* **Modular architecture** — each stage is decoupled, making the pipeline easy to test, debug, and extend  
+* **Evaluation coverage** — test suite validates latency, correctness, and pipeline behavior across multiple scenarios  
+* **Recommendation system** — app generates top 3 song recommendations using fused multimodal embeddings and cosine similarity  
+
+## What Doesn't (Yet)
+* **Limited personalization** — recommendations are not yet adapted to individual user preferences or feedback  
+* **Similarity performance** — similarity score quality still shows room for improvement, particularly in edge or ambiguous cases  
+* **Cold-start limitations** — without strong input signals (e.g., no image or weak query), results can be generic  
+
+## What's Next
+* **Streaming integration** — enable direct playback and deeper integration with platforms like Spotify  
+* **Model optimization** — further reduce latency and memory footprint through pruning, quantization, and delegate tuning  
+* **User-controlled sensor input** — allow users to customize which sensors are shared and used at runtime  
+* **Expanded modality support** — integrate audio snippets or microphone input for real-time ambient sound context  
 
 ## Documentation
 
