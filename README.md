@@ -36,6 +36,12 @@ When model assets are unavailable (e.g., on emulators), the pipeline falls back 
 * Android SDK 36 (compile) / SDK 24+ (min)
 * Physical device recommended (Samsung Galaxy S25 or other Qualcomm SoC for NPU acceleration)
 
+### Android Configuration
+
+1. **Gradle Sync**: Open the project in Android Studio and ensure `Gradle JDK` is set to **Java 17** in `Settings > Build, Execution, Deployment > Build Tools > Gradle`.
+2. **Local Properties**: Create or update `local.properties` in the root directory to include Spotify credentials (optional, see below) and ensure the `sdk.dir` is correct.
+3. **TFLite Assets**: Ensure `.tflite` files are recognized as non-compressible by the build system. This is already configured in `app/build.gradle.kts` via `androidResources.noCompress += "tflite"`.
+
 ### Build and Run
 
 ```bash
