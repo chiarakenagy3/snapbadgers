@@ -8,6 +8,14 @@
 
 ### [Project Repo Link](https://github.com/chiarakenagy3/snapbadgers)
 
+## Assignment Checklist (README Requirements)
+
+- **Link to your repository**: `https://github.com/chiarakenagy3/snapbadgers`
+- **Set-up steps**: See **Setup** (includes model assets + optional Spotify credentials)
+- **Overview of how the code works**: See **How It Works** and **Code Overview** (especially `docs/ARCHITECTURE.md`)
+- **What works & what doesn’t**: See **What Works** and **What Doesn't**
+- **What would you work on next**: See **What's Next**
+
 ### How It Works
 
 1. **Text Encoding.** A user query (e.g., "energetic workout music") is tokenized and encoded by MobileBERT into a 128-d embedding.
@@ -68,12 +76,29 @@ The app functions without these files using heuristic fallback encoders.
 For the song embedding sync feature, add to `local.properties`:
 
 ```properties
+spotify.token="YOUR_SPOTIFY_BEARER_TOKEN"          # optional (some flows may use this)
 spotify.client.id="YOUR_CLIENT_ID"
 spotify.client.secret="YOUR_CLIENT_SECRET"
 spotify.refresh.token="YOUR_REFRESH_TOKEN"
 ```
 
 See [README_SongEmbeddings.md](README_SongEmbeddings.md) for full Spotify setup instructions.
+
+### Code Overview
+
+If you want to trace the “6-stage pipeline” through the actual code, these are the most direct entry points:
+
+- **UI entry**: `app/src/main/java/com/example/snapbadgers/ui/MainActivity.kt` launches `SnapBadgersDemoScreen`
+- **Pipeline orchestrator**: `app/src/main/java/com/example/snapbadgers/ai/pipeline/RecommendationPipeline.kt`
+  - Runs text/vision/sensor encoders in parallel coroutines, then **fusion → projection → ranking**
+- **Encoders**:
+  - Text: `ai/text/` + `ai/text/ml/` (MobileBERT + tokenizer + fallback)
+  - Vision: `ai/vision/` (EfficientNet + preprocessing)
+  - Sensor: `ai/sensor/` (feature extraction + small MLP)
+- **Fusion & projection**: `ai/fusion/FusionEngine.kt`, `ai/projection/ProjectionNetwork.kt`
+- **Ranking / catalog**: `data/SongRepository.kt` loads JSON catalog and performs cosine similarity top-k
+
+For a deeper walkthrough, see `docs/ARCHITECTURE.md` (directory tree + data flow + threading + hardware acceleration notes).
 
 ### Running Tests
 
