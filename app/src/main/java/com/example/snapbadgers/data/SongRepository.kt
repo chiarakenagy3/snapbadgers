@@ -79,6 +79,7 @@ class SongRepository(context: Context) {
                 Song(
                     title = track.name,
                     artist = track.artists,
+                    spotifyTrackId = track.trackId,
                     embedding = VectorUtils.alignToEmbeddingDimension(
                         track.embedding.toFloatArray(),
                         salt = QUERY_SALT
